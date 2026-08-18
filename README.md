@@ -27,3 +27,16 @@ available after normal Tinkers assembly and modification.
 
 The initial code establishes step 2 without registering every possible alloy as
 a global material. Equivalent ratios share the same compact fingerprint.
+
+## Integration architecture
+
+- `SilentGearAlloyReader` reads the real `silentgear:alloy_ingot` material list,
+  including the legacy save format, and converts it to a canonical composition.
+- A single addon-owned molten-alloy fluid will carry that composition in its
+  `FluidStack` tag. Different alloys therefore do not require globally
+  registering hundreds of fluids or materials.
+- Custom melting and casting recipes will copy the tag from ingot to fluid and
+  from fluid to the cast part. Tinkers 3.11 exposes both inventory-aware melting
+  output and casting-fluid NBT, so this path preserves identity through tanks.
+- Grade, starcharged state, and calculated trait/stat data will be added to the
+  same bounded payload before the first playable vertical slice.
