@@ -1,6 +1,7 @@
 package com.anthonyahellman.silenttinkers.registry;
 
 import com.anthonyahellman.silenttinkers.SilentTinkersMod;
+import com.anthonyahellman.silenttinkers.fluid.CompositeAlloyFluidType;
 import net.minecraft.world.level.material.FlowingFluid;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraftforge.common.SoundActions;
@@ -18,10 +19,10 @@ public final class ModFluids {
 
     public static final RegistryObject<FluidType> COMPOSITE_ALLOY_TYPE = FLUID_TYPES.register(
             "molten_composite_alloy",
-            () -> new FluidType(FluidType.Properties.create()
+            () -> new CompositeAlloyFluidType(FluidType.Properties.create()
                     .density(3000).viscosity(6000).temperature(1500)
                     .sound(SoundActions.BUCKET_FILL, net.minecraft.sounds.SoundEvents.BUCKET_FILL_LAVA)
-                    .sound(SoundActions.BUCKET_EMPTY, net.minecraft.sounds.SoundEvents.BUCKET_EMPTY_LAVA)) {});
+                    .sound(SoundActions.BUCKET_EMPTY, net.minecraft.sounds.SoundEvents.BUCKET_EMPTY_LAVA)));
 
     public static final RegistryObject<FlowingFluid> MOLTEN_COMPOSITE_ALLOY = FLUIDS.register(
             "molten_composite_alloy", () -> new ForgeFlowingFluid.Source(properties()));
