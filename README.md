@@ -49,6 +49,8 @@ composition payload instead.
 - For ingredients that also exist in Tinkers or an installed Tinkers addon, the
   modifier asks Tinkers' live material registry for the real head traits. The
   addon that owns a trait therefore remains responsible for its implementation.
+  Resolution tries the exact ID, the built-in `tconstruct` equivalent, and then
+  a cross-addon path match only when that path is unique in the material registry.
 
 ## Current in-game validation
 

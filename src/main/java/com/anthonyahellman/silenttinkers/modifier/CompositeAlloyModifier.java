@@ -96,6 +96,18 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
         if (registry.getMaterial(tconstruct) != IMaterial.UNKNOWN) {
             return Optional.of(tconstruct);
         }
+
+        // Cross-addon bridges often retain the material path but use their own
+        // namespace. Accept that handshake only when the path is unique, so a
+        // pack with two unrelated materials named alike never gets a random trait.
+        List<MaterialId> samePath = registry.getAllMaterials().stream()
+                .map(IMaterial::getIdentifier)
+                .filter(id -> id.getPath().equals(sourceId.getPath()))
+                .distinct()
+                .toList();
+        if (samePath.size() == 1) {
+            return Optional.of(samePath.get(0));
+        }
         return Optional.empty();
     }
 
