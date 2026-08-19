@@ -2,6 +2,7 @@ package com.anthonyahellman.silenttinkers.registry;
 
 import com.anthonyahellman.silenttinkers.SilentTinkersMod;
 import com.anthonyahellman.silenttinkers.recipe.CompositeAlloyCastingRecipe;
+import com.anthonyahellman.silenttinkers.recipe.CompositePickHeadCastingRecipe;
 import com.anthonyahellman.silenttinkers.recipe.IdOnlyRecipeSerializer;
 import com.anthonyahellman.silenttinkers.recipe.SilentAlloyMeltingRecipe;
 import net.minecraft.world.item.crafting.RecipeSerializer;
@@ -19,6 +20,9 @@ public final class ModRecipes {
     public static final RegistryObject<RecipeSerializer<CompositeAlloyCastingRecipe>> COMPOSITE_ALLOY_CASTING =
             SERIALIZERS.register("composite_alloy_casting",
                     () -> new IdOnlyRecipeSerializer<>(CompositeAlloyCastingRecipe::new));
+    public static final RegistryObject<RecipeSerializer<CompositePickHeadCastingRecipe>> COMPOSITE_PICK_HEAD_CASTING =
+            SERIALIZERS.register("composite_pick_head_casting",
+                    () -> new IdOnlyRecipeSerializer<>(CompositePickHeadCastingRecipe::new));
 
     private ModRecipes() {}
 }

@@ -31,6 +31,15 @@ class AlloyCompositionTest {
     }
 
     @Test
+    void materialVariantRoundTripPreservesCanonicalIdentity() {
+        AlloyComposition original = AlloyComposition.of(alloy(7, 2, 1));
+        AlloyComposition restored = AlloyVariantCodec.decode(AlloyVariantCodec.encode(original));
+
+        assertEquals(original.ingredients(), restored.ingredients());
+        assertEquals(original.fingerprint(), restored.fingerprint());
+    }
+
+    @Test
     void rejectsUnsupportedPayloadVersion() {
         CompoundTag invalid = AlloyComposition.of(alloy(7, 2, 1)).save();
         invalid.putInt("Version", AlloyComposition.DATA_VERSION + 1);
