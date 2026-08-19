@@ -22,7 +22,7 @@ available after normal Tinkers assembly and modification.
 1. Read any valid Silent Gear compound alloy ingot. **Complete**
 2. Convert its composition into a canonical, versioned representation. **Complete**
 3. Preserve that representation through melting and casting. **Complete**
-4. Create one universal Tinkers tool part carrying the representation. **Next**
+4. Create one universal Tinkers pick head carrying the representation. **Complete**
 5. Apply weighted stats and thresholded native traits to a completed test tool.
 
 Equivalent ratios share the same compact fingerprint. Runtime-created alloys do
@@ -44,16 +44,23 @@ composition payload instead.
 
 ## Current in-game validation
 
-The alpha currently produces a diagnostic `Composite Alloy Sample`; it is not a
-usable tool part yet. This deliberately tests the risky NBT-carrying smeltery
-path before tool behavior is layered on top.
+The alpha produces both a diagnostic `Composite Alloy Sample` and a real
+`tconstruct:pick_head`. The pick head currently uses temporary iron-like stats;
+weighted Silent Gear stats and trait translation are the next milestone.
 
 1. Install Silent Tinkers with the compatibility baseline mods listed above.
 2. Make a `silentgear:alloy_ingot` through Silent Gear's normal alloy system.
 3. Melt one ingot in a Tinkers smeltery or melter at 1200 C or hotter.
-4. Pour one ingot (90 mB) into an empty casting table with no cast.
-5. Hover the resulting sample. Its tooltip should list the canonical material
+4. Pour one ingot (90 mB) into an empty casting table with no cast. Hover the
+   resulting sample; its tooltip should list the canonical material
    IDs, percentages, and composition fingerprint.
+5. For the real-part test, put a reusable pick head cast on the table and pour
+   two ingots (180 mB). The output should be a purple `tconstruct:pick_head`
+   whose `Material` NBT begins with
+   `silenttinkers:composite_alloy#v1.`.
+6. Build a normal Tinkers pickaxe with that head. This validates that Tinkers
+   preserves the dynamic material variant during assembly. The current tool
+   stats are intentionally the temporary baseline, not final alloy stats.
 
 Do not mix a second composition into a tank already holding composite alloy.
 The intended behavior is for differently tagged fluid stacks to remain
