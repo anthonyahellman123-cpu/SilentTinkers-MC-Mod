@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Encodes a complete composition into Tinkers' material variant string. The
@@ -45,6 +46,25 @@ public final class AlloyVariantCodec {
             throw new IllegalArgumentException("Encoded alloy exceeds " + MAX_ENCODED_LENGTH + " characters");
         }
         return charged;
+    }
+
+    public static String encode(AlloyComposition composition, int starChargeLevel,
+                                Optional<AlloyStatSnapshot> stats) {
+        String encoded = encode(composition, starChargeLevel);
+        if (stats.isEmpty()) {
+            return encoded;
+        }
+        AlloyStatSnapshot value = stats.get();
+        String statData = ".d"
+                + encodeFloat(value.durability()) + '_'
+                + encodeFloat(value.miningSpeed()) + '_'
+                + encodeFloat(value.meleeDamage()) + '_'
+                + encodeFloat(value.attackSpeed()) + '_'
+                + HexFormat.of().formatHex(value.harvestTier().toString().getBytes(StandardCharsets.UTF_8));
+        if (encoded.length() + statData.length() > MAX_ENCODED_LENGTH) {
+            throw new IllegalArgumentException("Encoded alloy exceeds " + MAX_ENCODED_LENGTH + " characters");
+        }
+        return encoded + statData;
     }
 
     public static AlloyComposition decode(String encoded) {
@@ -87,8 +107,10 @@ public final class AlloyVariantCodec {
         if (marker < 0) {
             return 0;
         }
+        int end = encoded.indexOf('.', marker + 2);
+        String levelText = encoded.substring(marker + 2, end < 0 ? encoded.length() : end);
         try {
-            int level = Integer.parseInt(encoded.substring(marker + 2), 36);
+            int level = Integer.parseInt(levelText, 36);
             if (level <= 0) {
                 throw new IllegalArgumentException("Invalid starcharge level");
             }
@@ -98,8 +120,55 @@ public final class AlloyVariantCodec {
         }
     }
 
+    public static Optional<AlloyStatSnapshot> decodeStats(String encoded) {
+        if (!encoded.startsWith(PREFIX) || encoded.length() > MAX_ENCODED_LENGTH) {
+            throw new IllegalArgumentException("Unsupported alloy variant");
+        }
+        int marker = encoded.lastIndexOf(".d");
+        if (marker < 0) {
+            return Optional.empty();
+        }
+        String[] fields = encoded.substring(marker + 2).split("_", -1);
+        if (fields.length != 5) {
+            throw new IllegalArgumentException("Malformed alloy stat snapshot");
+        }
+        try {
+            ResourceLocation tier = ResourceLocation.tryParse(new String(
+                    HexFormat.of().parseHex(fields[4]), StandardCharsets.UTF_8));
+            if (tier == null) {
+                throw new IllegalArgumentException("Invalid harvest tier in alloy stat snapshot");
+            }
+            return Optional.of(new AlloyStatSnapshot(
+                    decodeFloat(fields[0]), decodeFloat(fields[1]),
+                    decodeFloat(fields[2]), decodeFloat(fields[3]), tier));
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException("Malformed alloy stat snapshot", exception);
+        }
+    }
+
     private static String stripChargeSuffix(String encoded) {
-        int marker = encoded.lastIndexOf(".s");
+        int charge = encoded.indexOf(".s", PREFIX.length());
+        int stats = encoded.indexOf(".d", PREFIX.length());
+        int marker;
+        if (charge < 0) {
+            marker = stats;
+        } else if (stats < 0) {
+            marker = charge;
+        } else {
+            marker = Math.min(charge, stats);
+        }
         return marker < 0 ? encoded : encoded.substring(0, marker);
+    }
+
+    private static String encodeFloat(float value) {
+        return Integer.toUnsignedString(Float.floatToIntBits(value), 36);
+    }
+
+    private static float decodeFloat(String value) {
+        long bits = Long.parseUnsignedLong(value, 36);
+        if (bits > 0xFFFF_FFFFL) {
+            throw new NumberFormatException("Float bits exceed 32 bits");
+        }
+        return Float.intBitsToFloat((int) bits);
     }
 }

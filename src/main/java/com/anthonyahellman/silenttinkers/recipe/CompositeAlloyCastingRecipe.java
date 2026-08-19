@@ -42,7 +42,8 @@ public final class CompositeAlloyCastingRecipe extends AbstractCastingRecipe {
     public ItemStack assemble(ICastingContainer inventory, RegistryAccess access) {
         ItemStack result = new ItemStack(ModItems.COMPOSITE_ALLOY_SAMPLE.get());
         AlloyPayload.read(inventory.getFluidTag()).ifPresent(composition -> AlloyPayload.write(
-                result, composition, AlloyPayload.readStarChargeLevel(inventory.getFluidTag())));
+                result, composition, AlloyPayload.readStarChargeLevel(inventory.getFluidTag()),
+                AlloyPayload.readStats(inventory.getFluidTag())));
         return result;
     }
 

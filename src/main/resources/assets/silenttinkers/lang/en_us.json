@@ -2,6 +2,7 @@
   "item.silenttinkers.composite_alloy_sample": "Composite Alloy Sample",
   "fluid_type.silenttinkers.molten_composite_alloy": "Molten Composite Alloy",
   "material.silenttinkers.composite_alloy": "Composite Alloy",
+  "modifier.silenttinkers.composite_alloy": "Composite Alloy",
   "tooltip.silenttinkers.fingerprint": "Composition ID: %s",
   "tooltip.silenttinkers.starcharged": "Starcharged %s"
 }

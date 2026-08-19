@@ -49,6 +49,18 @@ class AlloyCompositionTest {
     }
 
     @Test
+    void evaluatedStatsSurviveMaterialVariantRoundTrip() {
+        AlloyComposition composition = AlloyComposition.of(alloy(7, 2, 1));
+        AlloyStatSnapshot stats = new AlloyStatSnapshot(
+                812.5f, 11.25f, 4.75f, 0.2f, id("minecraft:diamond"));
+        String encoded = AlloyVariantCodec.encode(composition, 2, java.util.Optional.of(stats));
+
+        assertEquals(composition.fingerprint(), AlloyVariantCodec.decode(encoded).fingerprint());
+        assertEquals(2, AlloyVariantCodec.decodeStarChargeLevel(encoded));
+        assertEquals(stats, AlloyVariantCodec.decodeStats(encoded).orElseThrow());
+    }
+
+    @Test
     void rejectsUnsupportedPayloadVersion() {
         CompoundTag invalid = AlloyComposition.of(alloy(7, 2, 1)).save();
         invalid.putInt("Version", AlloyComposition.DATA_VERSION + 1);

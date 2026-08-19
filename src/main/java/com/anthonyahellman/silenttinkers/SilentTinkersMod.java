@@ -3,6 +3,7 @@ package com.anthonyahellman.silenttinkers;
 import com.anthonyahellman.silenttinkers.config.SilentTinkersConfig;
 import com.anthonyahellman.silenttinkers.registry.ModFluids;
 import com.anthonyahellman.silenttinkers.registry.ModItems;
+import com.anthonyahellman.silenttinkers.registry.ModModifiers;
 import com.anthonyahellman.silenttinkers.registry.ModRecipes;
 import com.mojang.logging.LogUtils;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -24,6 +25,7 @@ public final class SilentTinkersMod {
         ModFluids.FLUID_TYPES.register(modBus);
         ModFluids.FLUIDS.register(modBus);
         ModRecipes.SERIALIZERS.register(modBus);
+        ModModifiers.MODIFIERS.register(modBus);
         LOGGER.info("Silent Tinkers compatibility bridge loaded");
     }
 }

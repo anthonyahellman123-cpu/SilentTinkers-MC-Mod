@@ -15,6 +15,7 @@ import java.util.Optional;
 public final class AlloyPayload {
     public static final String ROOT_KEY = "SilentTinkersAlloy";
     private static final String STAR_CHARGE_KEY = "StarChargeLevel";
+    private static final String STATS_KEY = "EvaluatedStats";
 
     private AlloyPayload() {}
 
@@ -27,12 +28,22 @@ public final class AlloyPayload {
     }
 
     public static void write(ItemStack stack, AlloyComposition composition, int starChargeLevel) {
-        stack.getOrCreateTag().put(ROOT_KEY, createRoot(composition, starChargeLevel));
+        write(stack, composition, starChargeLevel, Optional.empty());
     }
 
     public static void write(FluidStack stack, AlloyComposition composition, int starChargeLevel) {
+        write(stack, composition, starChargeLevel, Optional.empty());
+    }
+
+    public static void write(ItemStack stack, AlloyComposition composition, int starChargeLevel,
+                             Optional<AlloyStatSnapshot> stats) {
+        stack.getOrCreateTag().put(ROOT_KEY, createRoot(composition, starChargeLevel, stats));
+    }
+
+    public static void write(FluidStack stack, AlloyComposition composition, int starChargeLevel,
+                             Optional<AlloyStatSnapshot> stats) {
         CompoundTag tag = stack.getOrCreateTag();
-        tag.put(ROOT_KEY, createRoot(composition, starChargeLevel));
+        tag.put(ROOT_KEY, createRoot(composition, starChargeLevel, stats));
     }
 
     public static Optional<AlloyComposition> read(ItemStack stack) {
@@ -72,11 +83,31 @@ public final class AlloyPayload {
                 : 0;
     }
 
-    private static CompoundTag createRoot(AlloyComposition composition, int starChargeLevel) {
+    public static Optional<AlloyStatSnapshot> readStats(ItemStack stack) {
+        return readStats(stack.getTag());
+    }
+
+    public static Optional<AlloyStatSnapshot> readStats(FluidStack stack) {
+        return readStats(stack.getTag());
+    }
+
+    public static Optional<AlloyStatSnapshot> readStats(CompoundTag carrierTag) {
+        if (carrierTag == null || !carrierTag.contains(ROOT_KEY, Tag.TAG_COMPOUND)) {
+            return Optional.empty();
+        }
+        CompoundTag root = carrierTag.getCompound(ROOT_KEY);
+        return root.contains(STATS_KEY, Tag.TAG_COMPOUND)
+                ? AlloyStatSnapshot.load(root.getCompound(STATS_KEY))
+                : Optional.empty();
+    }
+
+    private static CompoundTag createRoot(AlloyComposition composition, int starChargeLevel,
+                                          Optional<AlloyStatSnapshot> stats) {
         CompoundTag root = composition.save();
         if (starChargeLevel > 0) {
             root.putInt(STAR_CHARGE_KEY, starChargeLevel);
         }
+        stats.ifPresent(value -> root.put(STATS_KEY, value.save()));
         return root;
     }
 }
