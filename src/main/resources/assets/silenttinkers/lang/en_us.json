@@ -1,3 +1,5 @@
 {
-  "mod.silenttinkers.name": "Silent Tinkers"
+  "item.silenttinkers.composite_alloy_sample": "Composite Alloy Sample",
+  "fluid_type.silenttinkers.molten_composite_alloy": "Molten Composite Alloy",
+  "tooltip.silenttinkers.fingerprint": "Composition ID: %s"
 }

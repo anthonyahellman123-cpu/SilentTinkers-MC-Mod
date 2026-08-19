@@ -1,6 +1,11 @@
 package com.anthonyahellman.silenttinkers;
 
+import com.anthonyahellman.silenttinkers.registry.ModFluids;
+import com.anthonyahellman.silenttinkers.registry.ModItems;
+import com.anthonyahellman.silenttinkers.registry.ModRecipes;
 import com.mojang.logging.LogUtils;
+import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import org.slf4j.Logger;
 
@@ -10,6 +15,11 @@ public final class SilentTinkersMod {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public SilentTinkersMod() {
-        LOGGER.info("Silent Tinkers compatibility foundation loaded");
+        IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
+        ModItems.ITEMS.register(modBus);
+        ModFluids.FLUID_TYPES.register(modBus);
+        ModFluids.FLUIDS.register(modBus);
+        ModRecipes.SERIALIZERS.register(modBus);
+        LOGGER.info("Silent Tinkers compatibility bridge loaded");
     }
 }
