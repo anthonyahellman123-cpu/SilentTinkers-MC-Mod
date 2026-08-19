@@ -1,31 +1,102 @@
 package com.anthonyahellman.silenttinkers.modifier;
 
 import com.anthonyahellman.silenttinkers.material.AlloyStatSnapshot;
+import com.anthonyahellman.silenttinkers.material.AlloyComposition;
 import com.anthonyahellman.silenttinkers.material.AlloyVariantCodec;
+import com.anthonyahellman.silenttinkers.material.MaterialIngredient;
+import com.anthonyahellman.silenttinkers.config.SilentTinkersConfig;
+import com.anthonyahellman.silenttinkers.config.TraitAccess;
 import com.anthonyahellman.silenttinkers.recipe.CompositePickHeadCastingRecipe;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Tier;
 import net.minecraftforge.common.TierSortingRegistry;
+import slimeknights.tconstruct.library.materials.IMaterialRegistry;
+import slimeknights.tconstruct.library.materials.MaterialRegistry;
+import slimeknights.tconstruct.library.materials.definition.IMaterial;
+import slimeknights.tconstruct.library.materials.definition.MaterialId;
 import slimeknights.tconstruct.library.materials.definition.MaterialVariant;
 import slimeknights.tconstruct.library.modifiers.Modifier;
 import slimeknights.tconstruct.library.modifiers.ModifierEntry;
 import slimeknights.tconstruct.library.modifiers.ModifierHooks;
 import slimeknights.tconstruct.library.modifiers.hook.build.ToolStatsModifierHook;
+import slimeknights.tconstruct.library.modifiers.hook.build.ModifierTraitHook;
 import slimeknights.tconstruct.library.module.ModuleHookMap;
 import slimeknights.tconstruct.library.tools.nbt.IToolContext;
 import slimeknights.tconstruct.library.tools.stat.ModifierStatsBuilder;
 import slimeknights.tconstruct.library.tools.stat.ToolStats;
+import slimeknights.tconstruct.tools.stats.HeadMaterialStats;
 
+import java.util.List;
 import java.util.Optional;
 
 /** Replaces the composite head's placeholder contribution with Silent Gear's evaluated stats. */
-public final class CompositeAlloyModifier extends Modifier implements ToolStatsModifierHook {
-    private static final float PLACEHOLDER_DURABILITY = 250.0f;
-    private static final float PLACEHOLDER_MINING_SPEED = 6.0f;
-    private static final float PLACEHOLDER_MELEE_DAMAGE = 2.0f;
+public final class CompositeAlloyModifier extends Modifier implements ToolStatsModifierHook, ModifierTraitHook {
+    private static final float PLACEHOLDER_DURABILITY = 1.0f;
+    private static final float PLACEHOLDER_MINING_SPEED = 1.0f;
+    private static final float PLACEHOLDER_MELEE_DAMAGE = 1.0f;
 
     @Override
     protected void registerHooks(ModuleHookMap.Builder hookBuilder) {
-        hookBuilder.addHook(this, ModifierHooks.TOOL_STATS);
+        hookBuilder.addHook(this, ModifierHooks.TOOL_STATS, ModifierHooks.MODIFIER_TRAITS);
+    }
+
+    /**
+     * Adds the real registered Tinkers traits for alloy ingredients that also
+     * exist as Tinkers materials. This deliberately asks Tinkers' live material
+     * registry instead of copying trait names, so addon modifier behavior stays
+     * owned by the addon that registered it.
+     */
+    @Override
+    public void addTraits(IToolContext context, ModifierEntry modifier, TraitBuilder builder,
+                          boolean firstEncounter) {
+        if (!firstEncounter) {
+            return;
+        }
+        IMaterialRegistry registry = MaterialRegistry.getInstance();
+        for (MaterialVariant material : context.getMaterials()) {
+            if (!material.getVariant().getId().equals(CompositePickHeadCastingRecipe.MATERIAL)) {
+                continue;
+            }
+            AlloyComposition composition;
+            try {
+                composition = AlloyVariantCodec.decode(material.getVariant().getVariant());
+            } catch (IllegalArgumentException exception) {
+                continue;
+            }
+            for (MaterialIngredient ingredient : composition.ingredients()) {
+                TraitAccess access = SilentTinkersConfig.traitThresholds()
+                        .accessFor(100.0 * ingredient.units() / composition.totalUnits());
+                if (access == TraitAccess.NONE) {
+                    continue;
+                }
+                resolveTinkersMaterial(registry, ingredient.materialId()).ifPresent(materialId -> {
+                    List<ModifierEntry> traits = registry.getTraits(materialId, HeadMaterialStats.ID);
+                    int allowed = switch (access) {
+                        case NONE -> 0;
+                        case PRIMARY -> 1;
+                        case SECONDARY -> 2;
+                        case FULL -> traits.size();
+                    };
+                    traits.stream().limit(allowed).forEach(builder::add);
+                });
+            }
+        }
+    }
+
+    private static Optional<MaterialId> resolveTinkersMaterial(IMaterialRegistry registry,
+                                                                ResourceLocation sourceId) {
+        MaterialId exact = new MaterialId(sourceId);
+        if (registry.getMaterial(exact) != IMaterial.UNKNOWN) {
+            return Optional.of(exact);
+        }
+
+        // Silent Gear's built-in IDs commonly use the silentgear namespace,
+        // while the equivalent Tinkers materials use tconstruct with the same path.
+        MaterialId tconstruct = new MaterialId("tconstruct", sourceId.getPath());
+        if (registry.getMaterial(tconstruct) != IMaterial.UNKNOWN) {
+            return Optional.of(tconstruct);
+        }
+        return Optional.empty();
     }
 
     @Override

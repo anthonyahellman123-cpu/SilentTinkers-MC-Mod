@@ -4,5 +4,11 @@
   "material.silenttinkers.composite_alloy": "Composite Alloy",
   "modifier.silenttinkers.composite_alloy": "Composite Alloy",
   "tooltip.silenttinkers.fingerprint": "Composition ID: %s",
-  "tooltip.silenttinkers.starcharged": "Starcharged %s"
+  "tooltip.silenttinkers.starcharged": "Starcharged %s",
+  "tooltip.silenttinkers.evaluated_stats": "Silent Gear evaluated stats",
+  "tooltip.silenttinkers.durability": "Durability: %s",
+  "tooltip.silenttinkers.mining_speed": "Mining speed: %s",
+  "tooltip.silenttinkers.melee_damage": "Melee damage: %s",
+  "tooltip.silenttinkers.attack_speed": "Attack speed: %s",
+  "tooltip.silenttinkers.harvest_tier": "Harvest tier: %s"
 }

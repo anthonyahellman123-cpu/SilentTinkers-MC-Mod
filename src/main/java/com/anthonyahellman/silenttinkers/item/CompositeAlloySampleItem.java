@@ -2,6 +2,7 @@ package com.anthonyahellman.silenttinkers.item;
 
 import com.anthonyahellman.silenttinkers.material.AlloyPayload;
 import com.anthonyahellman.silenttinkers.material.MaterialIngredient;
+import com.anthonyahellman.silenttinkers.material.AlloyStatSnapshot;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
@@ -33,7 +34,23 @@ public final class CompositeAlloySampleItem extends Item {
                 tooltip.add(Component.translatable("tooltip.silenttinkers.starcharged", starChargeLevel)
                         .withStyle(ChatFormatting.AQUA));
             }
+            AlloyPayload.readStats(stack).ifPresent(stats -> appendStats(tooltip, stats));
         });
         super.appendHoverText(stack, level, tooltip, flag);
+    }
+
+    private static void appendStats(List<Component> tooltip, AlloyStatSnapshot stats) {
+        tooltip.add(Component.translatable("tooltip.silenttinkers.evaluated_stats")
+                .withStyle(ChatFormatting.GOLD));
+        tooltip.add(Component.translatable("tooltip.silenttinkers.durability", stats.durability())
+                .withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("tooltip.silenttinkers.mining_speed", stats.miningSpeed())
+                .withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("tooltip.silenttinkers.melee_damage", stats.meleeDamage())
+                .withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("tooltip.silenttinkers.attack_speed", stats.attackSpeed())
+                .withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("tooltip.silenttinkers.harvest_tier", stats.harvestTier())
+                .withStyle(ChatFormatting.GRAY));
     }
 }
