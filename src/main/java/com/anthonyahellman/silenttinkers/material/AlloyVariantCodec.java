@@ -35,12 +35,25 @@ public final class AlloyVariantCodec {
         return encoded.toString();
     }
 
+    public static String encode(AlloyComposition composition, int starChargeLevel) {
+        String encoded = encode(composition);
+        if (starChargeLevel <= 0) {
+            return encoded;
+        }
+        String charged = encoded + ".s" + Integer.toString(starChargeLevel, 36);
+        if (charged.length() > MAX_ENCODED_LENGTH) {
+            throw new IllegalArgumentException("Encoded alloy exceeds " + MAX_ENCODED_LENGTH + " characters");
+        }
+        return charged;
+    }
+
     public static AlloyComposition decode(String encoded) {
         if (!encoded.startsWith(PREFIX) || encoded.length() > MAX_ENCODED_LENGTH) {
             throw new IllegalArgumentException("Unsupported alloy variant");
         }
+        String compositionData = stripChargeSuffix(encoded);
         Map<ResourceLocation, Long> ingredients = new LinkedHashMap<>();
-        for (String entry : encoded.substring(PREFIX.length()).split("-")) {
+        for (String entry : compositionData.substring(PREFIX.length()).split("-")) {
             int separator = entry.lastIndexOf('_');
             if (separator <= 0 || separator == entry.length() - 1) {
                 throw new IllegalArgumentException("Malformed alloy variant entry");
@@ -64,5 +77,29 @@ public final class AlloyVariantCodec {
             ingredients.merge(materialId, units, Math::addExact);
         }
         return AlloyComposition.of(ingredients);
+    }
+
+    public static int decodeStarChargeLevel(String encoded) {
+        if (!encoded.startsWith(PREFIX) || encoded.length() > MAX_ENCODED_LENGTH) {
+            throw new IllegalArgumentException("Unsupported alloy variant");
+        }
+        int marker = encoded.lastIndexOf(".s");
+        if (marker < 0) {
+            return 0;
+        }
+        try {
+            int level = Integer.parseInt(encoded.substring(marker + 2), 36);
+            if (level <= 0) {
+                throw new IllegalArgumentException("Invalid starcharge level");
+            }
+            return level;
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException("Invalid starcharge level", exception);
+        }
+    }
+
+    private static String stripChargeSuffix(String encoded) {
+        int marker = encoded.lastIndexOf(".s");
+        return marker < 0 ? encoded : encoded.substring(0, marker);
     }
 }

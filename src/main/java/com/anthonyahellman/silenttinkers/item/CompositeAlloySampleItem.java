@@ -28,6 +28,11 @@ public final class CompositeAlloySampleItem extends Item {
                 tooltip.add(Component.literal(String.format("%s: %.1f%%", ingredient.materialId(), percent))
                         .withStyle(ChatFormatting.GRAY));
             }
+            int starChargeLevel = AlloyPayload.readStarChargeLevel(stack);
+            if (starChargeLevel > 0) {
+                tooltip.add(Component.translatable("tooltip.silenttinkers.starcharged", starChargeLevel)
+                        .withStyle(ChatFormatting.AQUA));
+            }
         });
         super.appendHoverText(stack, level, tooltip, flag);
     }

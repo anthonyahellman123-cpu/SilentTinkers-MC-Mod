@@ -24,6 +24,7 @@ public final class SilentGearAlloyReader {
     private static final String MATERIALS_KEY = "Materials";
     private static final String MATERIAL_ID_KEY = "ID";
     private static final String COUNT_KEY = "Count";
+    private static final String STARCHARGED_KEY = "SG_Starcharged";
 
     private SilentGearAlloyReader() {
     }
@@ -63,6 +64,18 @@ public final class SilentGearAlloyReader {
         } catch (ArithmeticException | IllegalArgumentException exception) {
             return Optional.empty();
         }
+    }
+
+    /** Returns the Silent Gear starcharge tier, or zero when uncharged/malformed. */
+    public static int readStarChargeLevel(ItemStack stack) {
+        if (stack.isEmpty() || !ALLOY_INGOT.equals(BuiltInRegistries.ITEM.getKey(stack.getItem()))) {
+            return 0;
+        }
+        CompoundTag tag = stack.getTag();
+        if (tag == null || !tag.contains(STARCHARGED_KEY, Tag.TAG_ANY_NUMERIC)) {
+            return 0;
+        }
+        return Math.max(0, tag.getShort(STARCHARGED_KEY));
     }
 
     private static void readCurrentFormat(ListTag materials, Map<ResourceLocation, Long> shares) {

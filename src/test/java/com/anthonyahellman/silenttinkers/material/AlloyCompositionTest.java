@@ -40,6 +40,15 @@ class AlloyCompositionTest {
     }
 
     @Test
+    void chargedMaterialVariantPreservesChargeAndComposition() {
+        AlloyComposition original = AlloyComposition.of(alloy(7, 2, 1));
+        String encoded = AlloyVariantCodec.encode(original, 3);
+
+        assertEquals(original.fingerprint(), AlloyVariantCodec.decode(encoded).fingerprint());
+        assertEquals(3, AlloyVariantCodec.decodeStarChargeLevel(encoded));
+    }
+
+    @Test
     void rejectsUnsupportedPayloadVersion() {
         CompoundTag invalid = AlloyComposition.of(alloy(7, 2, 1)).save();
         invalid.putInt("Version", AlloyComposition.DATA_VERSION + 1);

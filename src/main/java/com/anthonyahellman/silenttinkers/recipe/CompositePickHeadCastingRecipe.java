@@ -54,9 +54,11 @@ public final class CompositePickHeadCastingRecipe extends AbstractCastingRecipe 
     @Override
     public ItemStack assemble(ICastingContainer inventory, RegistryAccess access) {
         return AlloyPayload.read(inventory.getFluidTag()).map(composition -> {
-            MaterialVariantId variant = MaterialVariantId.create(MATERIAL, AlloyVariantCodec.encode(composition));
+            int starChargeLevel = AlloyPayload.readStarChargeLevel(inventory.getFluidTag());
+            MaterialVariantId variant = MaterialVariantId.create(
+                    MATERIAL, AlloyVariantCodec.encode(composition, starChargeLevel));
             ItemStack part = TinkerToolParts.pickHead.get().withMaterial(variant);
-            AlloyPayload.write(part, composition);
+            AlloyPayload.write(part, composition, starChargeLevel);
             return part;
         }).orElse(ItemStack.EMPTY);
     }

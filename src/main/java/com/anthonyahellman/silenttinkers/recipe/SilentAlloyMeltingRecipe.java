@@ -32,8 +32,8 @@ public final class SilentAlloyMeltingRecipe implements IMeltingRecipe {
     @Override
     public FluidStack getOutput(IMeltingContainer inventory) {
         FluidStack output = new FluidStack(ModFluids.MOLTEN_COMPOSITE_ALLOY.get(), FluidValues.INGOT);
-        SilentGearAlloyReader.read(inventory.getStack())
-                .ifPresent(composition -> AlloyPayload.write(output, composition));
+        SilentGearAlloyReader.read(inventory.getStack()).ifPresent(composition -> AlloyPayload.write(
+                output, composition, SilentGearAlloyReader.readStarChargeLevel(inventory.getStack())));
         return output;
     }
 
