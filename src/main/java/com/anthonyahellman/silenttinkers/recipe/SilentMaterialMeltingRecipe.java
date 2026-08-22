@@ -1,12 +1,10 @@
 package com.anthonyahellman.silenttinkers.recipe;
 
 import com.anthonyahellman.silenttinkers.compat.silentgear.SilentGearAlloyReader;
-import com.anthonyahellman.silenttinkers.material.AlloyComposition;
 import com.anthonyahellman.silenttinkers.material.AlloyPayload;
-import com.anthonyahellman.silenttinkers.material.AlloyStatSnapshot;
+import com.anthonyahellman.silenttinkers.material.DynamicTinkersBridgePayload;
 import com.anthonyahellman.silenttinkers.material.MaterialDiscoveryState;
 import com.anthonyahellman.silenttinkers.material.MaterialGenerationEvaluation;
-import com.anthonyahellman.silenttinkers.material.TranslatedMaterialStats;
 import com.anthonyahellman.silenttinkers.registry.ModFluids;
 import com.anthonyahellman.silenttinkers.registry.ModRecipes;
 import net.minecraft.core.NonNullList;
@@ -21,8 +19,6 @@ import slimeknights.tconstruct.library.recipe.FluidValues;
 import slimeknights.tconstruct.library.recipe.melting.IMeltingContainer;
 import slimeknights.tconstruct.library.recipe.melting.IMeltingRecipe;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -45,28 +41,19 @@ public final class SilentMaterialMeltingRecipe implements IMeltingRecipe {
 
     @Override
     public boolean matches(IMeltingContainer inventory, Level level) {
-        return findReadyEvaluation(inventory.getStack()).isPresent();
+        return findReadyEvaluation(inventory.getStack())
+                .flatMap(DynamicTinkersBridgePayload::from)
+                .isPresent();
     }
 
     @Override
     public FluidStack getOutput(IMeltingContainer inventory) {
-        Optional<MaterialGenerationEvaluation> evaluation = findReadyEvaluation(inventory.getStack());
-        if (evaluation.isEmpty()) return FluidStack.EMPTY;
-
-        MaterialGenerationEvaluation ready = evaluation.get();
-        ResourceLocation sourceMaterial = ready.request().sourceMaterialId().orElse(null);
-        TranslatedMaterialStats translated = ready.translatedStats().orElse(null);
-        if (sourceMaterial == null || translated == null) return FluidStack.EMPTY;
-
-        Map<ResourceLocation, Long> ingredients = new LinkedHashMap<>();
-        ingredients.put(sourceMaterial, 1L);
-        AlloyComposition composition = AlloyComposition.of(ingredients);
-        AlloyStatSnapshot stats = new AlloyStatSnapshot(
-                translated.durability(), translated.miningSpeed(), translated.meleeDamage(),
-                translated.attackSpeed(), translated.harvestTier());
+        Optional<DynamicTinkersBridgePayload> payload = findReadyEvaluation(inventory.getStack())
+                .flatMap(DynamicTinkersBridgePayload::from);
+        if (payload.isEmpty()) return FluidStack.EMPTY;
 
         FluidStack output = new FluidStack(ModFluids.MOLTEN_COMPOSITE_ALLOY.get(), FluidValues.INGOT);
-        AlloyPayload.write(output, composition, 0, Optional.of(stats));
+        AlloyPayload.write(output, payload.get().composition(), 0, Optional.of(payload.get().stats()));
         return output;
     }
 
