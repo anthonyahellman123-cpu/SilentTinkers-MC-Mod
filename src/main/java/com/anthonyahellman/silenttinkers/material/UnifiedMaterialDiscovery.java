@@ -33,7 +33,6 @@ public final class UnifiedMaterialDiscovery {
         ambiguous.sort(byItem);
 
         Snapshot snapshot = new Snapshot(index, silentGear, tinkers, List.copyOf(correlated), List.copyOf(bridgeCandidates));
-        MaterialDiscoveryState.publish(snapshot);
 
         SilentTinkersMod.LOGGER.info("Material discovery: SG={} materials/{} aliases, TCon={} materials/{} aliases, correlated={}, bridgeCandidates={}, ambiguous={}",
                 silentGear.materials(), silentGear.physicalAliases(), tinkers.materials(), tinkers.physicalAliases(),
@@ -111,6 +110,10 @@ public final class UnifiedMaterialDiscovery {
         SilentTinkersMod.LOGGER.info(
                 "[SilentTinkers:TRANSLATION_PLAN] translated={} tinkersNativeReady={} failed={}",
                 translated, tinkersNativeReady, translationFailed);
+
+        // Publish only a completely evaluated snapshot. If anything above throws,
+        // lifecycle code can fail closed without exposing a partially scanned state.
+        MaterialDiscoveryState.publish(snapshot);
         return snapshot;
     }
 
