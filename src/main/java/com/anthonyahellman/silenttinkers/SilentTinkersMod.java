@@ -32,22 +32,25 @@ public final class SilentTinkersMod {
         ModRecipes.SERIALIZERS.register(modBus);
         ModModifiers.MODIFIERS.register(modBus);
 
-        // Do not scan from AddReloadListenerEvent. Our first pack test proved our
-        // listener's apply() ran before Silent Gear/Tinkers had published their
-        // own datapack-backed material registries. Datapack sync occurs after the
-        // reload is complete and is therefore a safe observation point.
         MinecraftForge.EVENT_BUS.addListener(this::onDatapackSync);
         MinecraftForge.EVENT_BUS.addListener(this::onServerStopped);
         LOGGER.info("Silent Tinkers compatibility bridge loaded");
     }
 
     private void onDatapackSync(OnDatapackSyncEvent event) {
-        // player == null means a global sync after a reload. A non-null player is
-        // normally a login sync; avoid rescanning the whole material graph for
-        // every player joining once a valid snapshot already exists.
-        if (event.getPlayer() == null || MaterialDiscoveryState.current().isEmpty()) {
-            LOGGER.info("SilentTinkers material scan starting after datapack sync");
+        if (event.getPlayer() != null && MaterialDiscoveryState.current().isPresent()) {
+            return;
+        }
+
+        LOGGER.info("SilentTinkers material scan starting after datapack sync");
+        try {
             UnifiedMaterialDiscovery.discover();
+        } catch (RuntimeException | LinkageError exception) {
+            // A bad addon/material must never make player login or a dedicated
+            // server datapack sync fail. Drop the snapshot so the bridge cannot
+            // act on stale or partial data; later syncs may safely retry.
+            MaterialDiscoveryState.clear();
+            LOGGER.error("[SilentTinkers:SCAN_FAILED] Material discovery failed; automatic bridging disabled until a later successful scan", exception);
         }
     }
 
