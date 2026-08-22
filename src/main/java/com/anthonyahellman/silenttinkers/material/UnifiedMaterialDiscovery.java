@@ -101,6 +101,9 @@ public final class UnifiedMaterialDiscovery {
         Snapshot completedSnapshot = new Snapshot(index, silentGear, tinkers,
                 List.copyOf(correlated), List.copyOf(bridgeCandidates), List.copyOf(evaluations));
         MaterialDiscoveryState.publish(completedSnapshot);
+        SilentTinkersMod.LOGGER.info(
+                "[SilentTinkers:RUNTIME_INDEX] dynamicTinkersMaterials={} -- eligible for tagged-fluid casting",
+                MaterialDiscoveryState.readyForTinkersCount());
         return completedSnapshot;
     }
 
