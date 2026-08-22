@@ -36,15 +36,8 @@ public final class UnifiedMaterialDiscovery {
         correlated.sort(byItem);
         bridgeCandidates.sort(byItem);
 
-        Snapshot snapshot = new Snapshot(
-                index,
-                silentGear,
-                tinkers,
-                List.copyOf(correlated),
-                List.copyOf(bridgeCandidates));
-
-        // Publish only after both ecosystem passes and classification finish, so
-        // consumers never observe a half-built index during datapack reload.
+        Snapshot snapshot = new Snapshot(index, silentGear, tinkers,
+                List.copyOf(correlated), List.copyOf(bridgeCandidates));
         MaterialDiscoveryState.publish(snapshot);
 
         SilentTinkersMod.LOGGER.info(
@@ -67,6 +60,24 @@ public final class UnifiedMaterialDiscovery {
                     candidate.physicalItem(), profile.ecosystem(), profile.materialId());
         }
 
+        // Dry-run the generation planner. This deliberately creates no materials
+        // yet; it makes the first real modpack test prove our decisions before we
+        // allow the generator to mutate either ecosystem.
+        List<MaterialGenerationRequest> requests = MaterialGenerationPlanner.fromDiscovery(snapshot);
+        long actionable = requests.stream().filter(MaterialGenerationRequest::generatesAnything).count();
+        SilentTinkersMod.LOGGER.info(
+                "[SilentTinkers:GENERATION_PLAN] total={} actionable={} preserved={}",
+                requests.size(), actionable, requests.size() - actionable);
+        for (MaterialGenerationRequest request : requests) {
+            if (request.generatesAnything()) {
+                SilentTinkersMod.LOGGER.info(
+                        "[SilentTinkers:GENERATE] item={} action={} source={} target={}",
+                        request.physicalItem(), request.action(),
+                        request.source().map(Enum::name).orElse("NONE"),
+                        request.target().map(Enum::name).orElse("BOTH"));
+            }
+        }
+
         return snapshot;
     }
 
@@ -76,13 +87,7 @@ public final class UnifiedMaterialDiscovery {
             TinkersCorrelationAdapter.DiscoveryReport tinkers,
             List<MaterialCorrelationIndex.Candidate> correlated,
             List<MaterialCorrelationIndex.Candidate> bridgeCandidates) {
-
-        public int correlatedPhysicalItems() {
-            return correlated.size();
-        }
-
-        public int bridgeCandidateCount() {
-            return bridgeCandidates.size();
-        }
+        public int correlatedPhysicalItems() { return correlated.size(); }
+        public int bridgeCandidateCount() { return bridgeCandidates.size(); }
     }
 }
