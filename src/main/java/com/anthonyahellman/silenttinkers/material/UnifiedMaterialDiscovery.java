@@ -43,14 +43,16 @@ public final class UnifiedMaterialDiscovery {
                 List.copyOf(correlated),
                 List.copyOf(bridgeCandidates));
 
+        // Publish only after both ecosystem passes and classification finish, so
+        // consumers never observe a half-built index during datapack reload.
+        MaterialDiscoveryState.publish(snapshot);
+
         SilentTinkersMod.LOGGER.info(
                 "Material discovery: SG={} materials/{} aliases, TCon={} materials/{} aliases, correlated={}, bridgeCandidates={}",
                 silentGear.materials(), silentGear.physicalAliases(),
                 tinkers.materials(), tinkers.physicalAliases(),
                 correlated.size(), bridgeCandidates.size());
 
-        // Keep the report deterministic so a player's latest.log can be pasted
-        // directly into an issue or compared between modpack versions.
         for (MaterialCorrelationIndex.Candidate candidate : correlated) {
             SilentTinkersMod.LOGGER.info(
                     "[SilentTinkers:CORRELATED] item={} SG={} TCon={}",
