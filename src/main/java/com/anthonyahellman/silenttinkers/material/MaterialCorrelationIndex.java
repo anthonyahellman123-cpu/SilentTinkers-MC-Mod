@@ -10,20 +10,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-/**
- * Mutable staging index used by discovery adapters.
- *
- * <p>Discovery is allowed to report several physical aliases for one native
- * material (for example multiple ingots accepted by a tag-backed recipe).
- * Aliases are indexed together first; cross-ecosystem correlation only occurs
- * when both sides actually share a physical item identity.</p>
- */
+/** Mutable staging index used by discovery adapters. */
 public final class MaterialCorrelationIndex {
-    /**
-     * Items commonly used by datapack-driven material systems as sentinels when
-     * a material has no real physical item. They must never become correlation
-     * keys: many unrelated materials can legitimately point at the same sentinel.
-     */
     private static final Set<ResourceLocation> NON_PHYSICAL_SENTINELS = Set.of(
             new ResourceLocation("minecraft", "air"),
             new ResourceLocation("minecraft", "barrier"),
@@ -34,86 +22,69 @@ public final class MaterialCorrelationIndex {
     private final Map<ProfileKey, Set<ResourceLocation>> aliasesByProfile = new LinkedHashMap<>();
 
     public void accept(ResourceLocation physicalItem, MaterialProfile profile) {
-        if (!isConcretePhysicalItem(physicalItem)) {
-            return;
-        }
+        if (!isConcretePhysicalItem(physicalItem)) return;
         byPhysicalItem.computeIfAbsent(physicalItem, Candidate::new).put(profile);
-        aliasesByProfile.computeIfAbsent(ProfileKey.of(profile), ignored -> new LinkedHashSet<>())
-                .add(physicalItem);
+        aliasesByProfile.computeIfAbsent(ProfileKey.of(profile), ignored -> new LinkedHashSet<>()).add(physicalItem);
     }
 
-    /** Adds every concrete physical alias discovered for one ecosystem profile. */
     public void acceptAll(Collection<ResourceLocation> physicalItems, MaterialProfile profile) {
-        for (ResourceLocation physicalItem : physicalItems) {
-            accept(physicalItem, profile);
-        }
+        for (ResourceLocation physicalItem : physicalItems) accept(physicalItem, profile);
     }
 
     private static boolean isConcretePhysicalItem(ResourceLocation physicalItem) {
         return physicalItem != null && !NON_PHYSICAL_SENTINELS.contains(physicalItem);
     }
 
-    public Optional<Candidate> get(ResourceLocation physicalItem) {
-        return Optional.ofNullable(byPhysicalItem.get(physicalItem));
-    }
-
-    public Collection<Candidate> all() {
-        return java.util.List.copyOf(byPhysicalItem.values());
-    }
-
-    /** Returns all concrete item aliases seen for a native material profile. */
+    public Optional<Candidate> get(ResourceLocation physicalItem) { return Optional.ofNullable(byPhysicalItem.get(physicalItem)); }
+    public Collection<Candidate> all() { return java.util.List.copyOf(byPhysicalItem.values()); }
     public Set<ResourceLocation> aliases(MaterialProfile profile) {
         return Set.copyOf(aliasesByProfile.getOrDefault(ProfileKey.of(profile), Set.of()));
     }
 
     private record ProfileKey(MaterialProfile.Ecosystem ecosystem, ResourceLocation materialId) {
-        private static ProfileKey of(MaterialProfile profile) {
-            return new ProfileKey(profile.ecosystem(), profile.materialId());
-        }
+        private static ProfileKey of(MaterialProfile profile) { return new ProfileKey(profile.ecosystem(), profile.materialId()); }
     }
 
     public static final class Candidate {
         private final ResourceLocation physicalItem;
-        private final Map<MaterialProfile.Ecosystem, MaterialProfile> profiles =
+        private final Map<MaterialProfile.Ecosystem, LinkedHashMap<ResourceLocation, MaterialProfile>> claims =
                 new EnumMap<>(MaterialProfile.Ecosystem.class);
 
-        private Candidate(ResourceLocation physicalItem) {
-            this.physicalItem = physicalItem;
-        }
+        private Candidate(ResourceLocation physicalItem) { this.physicalItem = physicalItem; }
 
         private void put(MaterialProfile profile) {
-            MaterialProfile previous = profiles.putIfAbsent(profile.ecosystem(), profile);
-            if (previous != null && !previous.materialId().equals(profile.materialId())) {
-                throw new IllegalStateException("Physical item " + physicalItem
-                        + " maps to multiple " + profile.ecosystem() + " materials: "
-                        + previous.materialId() + " and " + profile.materialId());
-            }
+            claims.computeIfAbsent(profile.ecosystem(), ignored -> new LinkedHashMap<>())
+                    .putIfAbsent(profile.materialId(), profile);
         }
 
-        public ResourceLocation physicalItem() {
-            return physicalItem;
-        }
+        public ResourceLocation physicalItem() { return physicalItem; }
+        public ResourceLocation physicalTag() { return physicalItem; }
 
-        /** Compatibility alias while UnifiedMaterial still names this field itemTag. */
-        public ResourceLocation physicalTag() {
-            return physicalItem;
-        }
-
+        /** Unique claims only. Ambiguous ecosystems are deliberately omitted. */
         public Map<MaterialProfile.Ecosystem, MaterialProfile> profiles() {
-            return Map.copyOf(profiles);
+            Map<MaterialProfile.Ecosystem, MaterialProfile> result = new EnumMap<>(MaterialProfile.Ecosystem.class);
+            for (var entry : claims.entrySet()) {
+                if (entry.getValue().size() == 1) result.put(entry.getKey(), entry.getValue().values().iterator().next());
+            }
+            return Map.copyOf(result);
         }
 
+        public Map<MaterialProfile.Ecosystem, Set<ResourceLocation>> claimIds() {
+            Map<MaterialProfile.Ecosystem, Set<ResourceLocation>> result = new EnumMap<>(MaterialProfile.Ecosystem.class);
+            for (var entry : claims.entrySet()) result.put(entry.getKey(), Set.copyOf(entry.getValue().keySet()));
+            return Map.copyOf(result);
+        }
+
+        public boolean ambiguous() { return claims.values().stream().anyMatch(group -> group.size() > 1); }
         public boolean correlated() {
-            return profiles.containsKey(MaterialProfile.Ecosystem.SILENT_GEAR)
-                    && profiles.containsKey(MaterialProfile.Ecosystem.TINKERS_CONSTRUCT);
+            return !ambiguous() && claims.containsKey(MaterialProfile.Ecosystem.SILENT_GEAR)
+                    && claims.containsKey(MaterialProfile.Ecosystem.TINKERS_CONSTRUCT);
         }
-
-        public boolean bridgeCandidate() {
-            return profiles.size() == 1;
-        }
+        public boolean bridgeCandidate() { return !ambiguous() && claims.size() == 1; }
 
         public UnifiedMaterial toUnified(ResourceLocation canonicalId) {
-            return new UnifiedMaterial(canonicalId, physicalItem, profiles);
+            if (ambiguous()) throw new IllegalStateException("Cannot unify ambiguous physical item " + physicalItem);
+            return new UnifiedMaterial(canonicalId, physicalItem, profiles());
         }
     }
 }
