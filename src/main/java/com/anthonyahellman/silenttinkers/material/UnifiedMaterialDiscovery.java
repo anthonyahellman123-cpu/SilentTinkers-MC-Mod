@@ -60,7 +60,7 @@ public final class UnifiedMaterialDiscovery {
                 requests.size(), actionable, requests.size() - actionable, ambiguous.size());
 
         int translated = 0;
-        int unsupportedDirection = 0;
+        int tinkersNativeReady = 0;
         int translationFailed = 0;
         for (MaterialGenerationRequest request : requests) {
             if (!request.generatesAnything()) continue;
@@ -72,7 +72,22 @@ public final class UnifiedMaterialDiscovery {
 
             if (request.action() != MaterialBridgePlan.Action.BRIDGE) continue;
             if (request.source().orElse(null) == MaterialProfile.Ecosystem.TINKERS_CONSTRUCT) {
-                unsupportedDirection++;
+                var nativeStats = MaterialStatTranslator.readNativeTinkers(request);
+                if (nativeStats.isPresent()) {
+                    var value = nativeStats.get();
+                    tinkersNativeReady++;
+                    SilentTinkersMod.LOGGER.info(
+                            "[SilentTinkers:TINKERS_NATIVE] item={} sourceMaterial={} headDurability={} miningSpeed={} meleeAttack={} tier={} handleDurability={} handleMiningSpeed={} handleAttackSpeed={} handleDamage={}",
+                            request.physicalItem(), request.sourceMaterialId().map(Object::toString).orElse("NONE"),
+                            value.headDurability(), value.headMiningSpeed(), value.headMeleeAttack(), value.harvestTier(),
+                            value.handleDurabilityModifier(), value.handleMiningSpeedModifier(),
+                            value.handleAttackSpeedModifier(), value.handleDamageModifier());
+                } else {
+                    translationFailed++;
+                    SilentTinkersMod.LOGGER.warn(
+                            "[SilentTinkers:TINKERS_NATIVE_FAILED] item={} sourceMaterial={} -- quarantined from generation",
+                            request.physicalItem(), request.sourceMaterialId().map(Object::toString).orElse("NONE"));
+                }
                 continue;
             }
 
@@ -94,8 +109,8 @@ public final class UnifiedMaterialDiscovery {
         }
 
         SilentTinkersMod.LOGGER.info(
-                "[SilentTinkers:TRANSLATION_PLAN] translated={} unsupportedDirection={} failed={}",
-                translated, unsupportedDirection, translationFailed);
+                "[SilentTinkers:TRANSLATION_PLAN] translated={} tinkersNativeReady={} failed={}",
+                translated, tinkersNativeReady, translationFailed);
         return snapshot;
     }
 
