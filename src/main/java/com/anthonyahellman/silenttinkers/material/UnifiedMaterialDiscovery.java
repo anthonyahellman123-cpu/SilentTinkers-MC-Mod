@@ -32,7 +32,8 @@ public final class UnifiedMaterialDiscovery {
         bridgeCandidates.sort(byItem);
         ambiguous.sort(byItem);
 
-        Snapshot snapshot = new Snapshot(index, silentGear, tinkers, List.copyOf(correlated), List.copyOf(bridgeCandidates));
+        Snapshot planningSnapshot = new Snapshot(index, silentGear, tinkers,
+                List.copyOf(correlated), List.copyOf(bridgeCandidates), List.of());
 
         SilentTinkersMod.LOGGER.info("Material discovery: SG={} materials/{} aliases, TCon={} materials/{} aliases, correlated={}, bridgeCandidates={}, ambiguous={}",
                 silentGear.materials(), silentGear.physicalAliases(), tinkers.materials(), tinkers.physicalAliases(),
@@ -43,7 +44,7 @@ public final class UnifiedMaterialDiscovery {
                     candidate.physicalItem(), candidate.claimIds());
         }
 
-        List<MaterialGenerationRequest> requests = MaterialGenerationPlanner.fromDiscovery(snapshot);
+        List<MaterialGenerationRequest> requests = MaterialGenerationPlanner.fromDiscovery(planningSnapshot);
         long actionable = requests.stream().filter(MaterialGenerationRequest::generatesAnything).count();
         SilentTinkersMod.LOGGER.info("[SilentTinkers:GENERATION_PLAN] total={} actionable={} preserved={} aliasQuarantined={}",
                 requests.size(), actionable, requests.size() - actionable, ambiguous.size());
@@ -52,9 +53,11 @@ public final class UnifiedMaterialDiscovery {
         int tinkersSourceReady = 0;
         int bootstrapPending = 0;
         int requestQuarantined = 0;
+        List<MaterialGenerationEvaluation> evaluations = new ArrayList<>(requests.size());
 
         for (MaterialGenerationRequest request : requests) {
             MaterialGenerationEvaluation evaluation = MaterialGenerationEvaluator.evaluate(request);
+            evaluations.add(evaluation);
             if (evaluation.status() == MaterialGenerationEvaluation.Status.PRESERVED) continue;
 
             SilentTinkersMod.LOGGER.info(
@@ -95,16 +98,22 @@ public final class UnifiedMaterialDiscovery {
                 "[SilentTinkers:EVALUATION_PLAN] readyForTinkers={} tinkersSourceReady={} bootstrapPending={} requestQuarantined={} aliasQuarantined={}",
                 readyForTinkers, tinkersSourceReady, bootstrapPending, requestQuarantined, ambiguous.size());
 
-        MaterialDiscoveryState.publish(snapshot);
-        return snapshot;
+        Snapshot completedSnapshot = new Snapshot(index, silentGear, tinkers,
+                List.copyOf(correlated), List.copyOf(bridgeCandidates), List.copyOf(evaluations));
+        MaterialDiscoveryState.publish(completedSnapshot);
+        return completedSnapshot;
     }
 
     public record Snapshot(MaterialCorrelationIndex index,
             SilentGearDiscoveryBridge.DiscoveryReport silentGear,
             TinkersCorrelationAdapter.DiscoveryReport tinkers,
             List<MaterialCorrelationIndex.Candidate> correlated,
-            List<MaterialCorrelationIndex.Candidate> bridgeCandidates) {
+            List<MaterialCorrelationIndex.Candidate> bridgeCandidates,
+            List<MaterialGenerationEvaluation> evaluations) {
         public int correlatedPhysicalItems() { return correlated.size(); }
         public int bridgeCandidateCount() { return bridgeCandidates.size(); }
+        public long readyForMutationCount() {
+            return evaluations.stream().filter(MaterialGenerationEvaluation::readyForMutation).count();
+        }
     }
 }
