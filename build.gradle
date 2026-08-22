@@ -14,7 +14,7 @@ base {
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
-println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch'}"
+println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch')}"
 minecraft {
     mappings channel: mapping_channel, version: mapping_version
     copyIdeResources = true
@@ -51,16 +51,23 @@ minecraft {
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 repositories {
+    // Keep the repositories content-scoped so Gradle never asks the Tinkers
+    // Maven for Curse artifacts (or CurseMaven for SlimeKnights artifacts).
     maven {
         name = 'DVS1 Maven FS'
         url = 'https://dvs1.progwml6.com/files/maven'
+        content {
+            includeGroup 'slimeknights.mantle'
+            includeGroup 'slimeknights.tconstruct'
+        }
     }
-    // CurseForge's Maven mirror. Silent Gear 3.6.7 publishes an official
-    // dependency coordinate here; compileOnly keeps SG out of our final jar.
     maven {
         name = 'CurseMaven'
         url = 'https://www.cursemaven.com'
         content { includeGroup 'curse.maven' }
+        metadataSources {
+            artifact()
+        }
     }
 }
 
