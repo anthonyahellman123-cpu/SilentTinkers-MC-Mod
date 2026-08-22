@@ -1,5 +1,6 @@
 package com.anthonyahellman.silenttinkers.recipe;
 
+import com.anthonyahellman.silenttinkers.compat.silentgear.SilentGearAlloyReader;
 import com.anthonyahellman.silenttinkers.material.AlloyComposition;
 import com.anthonyahellman.silenttinkers.material.AlloyPayload;
 import com.anthonyahellman.silenttinkers.material.AlloyStatSnapshot;
@@ -71,6 +72,12 @@ public final class SilentMaterialMeltingRecipe implements IMeltingRecipe {
 
     private static Optional<MaterialGenerationEvaluation> findReadyEvaluation(ItemStack stack) {
         if (stack.isEmpty()) return Optional.empty();
+
+        // Compound Silent Gear alloy stacks carry their own ratios/grade/charge
+        // and are handled by SilentAlloyMeltingRecipe. Never let the generic
+        // single-material bridge shadow that richer recipe.
+        if (SilentGearAlloyReader.read(stack).isPresent()) return Optional.empty();
+
         ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
         if (itemId == null) return Optional.empty();
         return MaterialDiscoveryState.readyForTinkers(itemId);
