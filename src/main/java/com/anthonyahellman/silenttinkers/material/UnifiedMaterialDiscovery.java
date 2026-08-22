@@ -58,13 +58,44 @@ public final class UnifiedMaterialDiscovery {
         long actionable = requests.stream().filter(MaterialGenerationRequest::generatesAnything).count();
         SilentTinkersMod.LOGGER.info("[SilentTinkers:GENERATION_PLAN] total={} actionable={} preserved={} quarantined={}",
                 requests.size(), actionable, requests.size() - actionable, ambiguous.size());
+
+        int translated = 0;
+        int unsupportedDirection = 0;
+        int translationFailed = 0;
         for (MaterialGenerationRequest request : requests) {
-            if (request.generatesAnything()) {
-                SilentTinkersMod.LOGGER.info("[SilentTinkers:GENERATE] item={} action={} source={} target={}",
-                        request.physicalItem(), request.action(), request.source().map(Enum::name).orElse("NONE"),
-                        request.target().map(Enum::name).orElse("BOTH"));
+            if (!request.generatesAnything()) continue;
+
+            SilentTinkersMod.LOGGER.info("[SilentTinkers:GENERATE] item={} action={} source={} sourceMaterial={} target={}",
+                    request.physicalItem(), request.action(), request.source().map(Enum::name).orElse("NONE"),
+                    request.sourceMaterialId().map(Object::toString).orElse("NONE"),
+                    request.target().map(Enum::name).orElse("BOTH"));
+
+            if (request.action() != MaterialBridgePlan.Action.BRIDGE) continue;
+            if (request.source().orElse(null) == MaterialProfile.Ecosystem.TINKERS_CONSTRUCT) {
+                unsupportedDirection++;
+                continue;
+            }
+
+            var stats = MaterialStatTranslator.translate(request);
+            if (stats.isPresent()) {
+                TranslatedMaterialStats value = stats.get();
+                translated++;
+                SilentTinkersMod.LOGGER.info(
+                        "[SilentTinkers:TRANSLATED] item={} sourceMaterial={} durability={} miningSpeed={} meleeDamage={} attackSpeed={} tier={}",
+                        request.physicalItem(), request.sourceMaterialId().map(Object::toString).orElse("NONE"),
+                        value.durability(), value.miningSpeed(), value.meleeDamage(), value.attackSpeed(), value.harvestTier());
+            } else {
+                translationFailed++;
+                SilentTinkersMod.LOGGER.warn(
+                        "[SilentTinkers:TRANSLATION_FAILED] item={} source={} sourceMaterial={} -- quarantined from generation",
+                        request.physicalItem(), request.source().map(Enum::name).orElse("NONE"),
+                        request.sourceMaterialId().map(Object::toString).orElse("NONE"));
             }
         }
+
+        SilentTinkersMod.LOGGER.info(
+                "[SilentTinkers:TRANSLATION_PLAN] translated={} unsupportedDirection={} failed={}",
+                translated, unsupportedDirection, translationFailed);
         return snapshot;
     }
 
