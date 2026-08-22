@@ -19,10 +19,24 @@ import java.util.Set;
  * when both sides actually share a physical item identity.</p>
  */
 public final class MaterialCorrelationIndex {
+    /**
+     * Items commonly used by datapack-driven material systems as sentinels when
+     * a material has no real physical item. They must never become correlation
+     * keys: many unrelated materials can legitimately point at the same sentinel.
+     */
+    private static final Set<ResourceLocation> NON_PHYSICAL_SENTINELS = Set.of(
+            new ResourceLocation("minecraft", "air"),
+            new ResourceLocation("minecraft", "barrier"),
+            new ResourceLocation("minecraft", "structure_void")
+    );
+
     private final Map<ResourceLocation, Candidate> byPhysicalItem = new LinkedHashMap<>();
     private final Map<ProfileKey, Set<ResourceLocation>> aliasesByProfile = new LinkedHashMap<>();
 
     public void accept(ResourceLocation physicalItem, MaterialProfile profile) {
+        if (!isConcretePhysicalItem(physicalItem)) {
+            return;
+        }
         byPhysicalItem.computeIfAbsent(physicalItem, Candidate::new).put(profile);
         aliasesByProfile.computeIfAbsent(ProfileKey.of(profile), ignored -> new LinkedHashSet<>())
                 .add(physicalItem);
@@ -33,6 +47,10 @@ public final class MaterialCorrelationIndex {
         for (ResourceLocation physicalItem : physicalItems) {
             accept(physicalItem, profile);
         }
+    }
+
+    private static boolean isConcretePhysicalItem(ResourceLocation physicalItem) {
+        return physicalItem != null && !NON_PHYSICAL_SENTINELS.contains(physicalItem);
     }
 
     public Optional<Candidate> get(ResourceLocation physicalItem) {
