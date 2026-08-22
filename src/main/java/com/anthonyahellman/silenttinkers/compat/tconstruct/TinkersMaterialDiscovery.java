@@ -37,7 +37,7 @@ public final class TinkersMaterialDiscovery {
             MaterialProfile profile = new MaterialProfile(
                     MaterialProfile.Ecosystem.TINKERS_CONSTRUCT,
                     materialId.getId(),
-                    Set.of());
+                    List.of());
 
             Set<ResourceLocation> physicalItems = new LinkedHashSet<>();
             Collection<MaterialVariantId> variants = MaterialRecipeCache.getVariants(materialId);
