@@ -29,10 +29,6 @@ public final class MaterialStatTranslator {
         };
     }
 
-    /**
-     * Reads Tinkers' native values without pretending its handle percentage
-     * modifiers are equivalent to Silent Gear's absolute stat fields.
-     */
     public static Optional<TinkersStatSnapshot> readNativeTinkers(MaterialGenerationRequest request) {
         if (request.source().orElse(null) != MaterialProfile.Ecosystem.TINKERS_CONSTRUCT) {
             return Optional.empty();
@@ -45,6 +41,7 @@ public final class MaterialStatTranslator {
         if (item == null) return Optional.empty();
 
         return SilentGearStatReader.read(new ItemStack(item))
-                .map(TranslatedMaterialStats::fromSilentGear);
+                .map(TranslatedMaterialStats::fromSilentGear)
+                .map(MaterialTranslationPolicy::apply);
     }
 }
