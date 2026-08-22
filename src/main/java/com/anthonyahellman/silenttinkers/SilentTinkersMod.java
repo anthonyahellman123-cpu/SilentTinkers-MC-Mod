@@ -1,6 +1,7 @@
 package com.anthonyahellman.silenttinkers;
 
 import com.anthonyahellman.silenttinkers.config.SilentTinkersConfig;
+import com.anthonyahellman.silenttinkers.material.MaterialDiscoveryState;
 import com.anthonyahellman.silenttinkers.material.UnifiedMaterialDiscovery;
 import com.anthonyahellman.silenttinkers.registry.ModFluids;
 import com.anthonyahellman.silenttinkers.registry.ModItems;
@@ -8,7 +9,8 @@ import com.anthonyahellman.silenttinkers.registry.ModModifiers;
 import com.anthonyahellman.silenttinkers.registry.ModRecipes;
 import com.mojang.logging.LogUtils;
 import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.AddReloadListenerEvent;
+import net.minecraftforge.event.OnDatapackSyncEvent;
+import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.config.ModConfig;
@@ -30,27 +32,26 @@ public final class SilentTinkersMod {
         ModRecipes.SERIALIZERS.register(modBus);
         ModModifiers.MODIFIERS.register(modBus);
 
-        // Material definitions and recipes are datapack-backed in both ecosystems.
-        // Rebuild our read-only correlation snapshot whenever server data reloads,
-        // after the reload has completed, rather than caching stale aliases forever.
-        MinecraftForge.EVENT_BUS.addListener(this::onAddReloadListeners);
+        // Do not scan from AddReloadListenerEvent. Our first pack test proved our
+        // listener's apply() ran before Silent Gear/Tinkers had published their
+        // own datapack-backed material registries. Datapack sync occurs after the
+        // reload is complete and is therefore a safe observation point.
+        MinecraftForge.EVENT_BUS.addListener(this::onDatapackSync);
+        MinecraftForge.EVENT_BUS.addListener(this::onServerStopped);
         LOGGER.info("Silent Tinkers compatibility bridge loaded");
     }
 
-    private void onAddReloadListeners(AddReloadListenerEvent event) {
-        event.addListener(new net.minecraft.server.packs.resources.SimplePreparableReloadListener<Void>() {
-            @Override
-            protected Void prepare(net.minecraft.server.packs.resources.ResourceManager resourceManager,
-                                   net.minecraft.util.profiling.ProfilerFiller profiler) {
-                return null;
-            }
+    private void onDatapackSync(OnDatapackSyncEvent event) {
+        // player == null means a global sync after a reload. A non-null player is
+        // normally a login sync; avoid rescanning the whole material graph for
+        // every player joining once a valid snapshot already exists.
+        if (event.getPlayer() == null || MaterialDiscoveryState.current().isEmpty()) {
+            LOGGER.info("SilentTinkers material scan starting after datapack sync");
+            UnifiedMaterialDiscovery.discover();
+        }
+    }
 
-            @Override
-            protected void apply(Void ignored,
-                                 net.minecraft.server.packs.resources.ResourceManager resourceManager,
-                                 net.minecraft.util.profiling.ProfilerFiller profiler) {
-                UnifiedMaterialDiscovery.discover();
-            }
-        });
+    private void onServerStopped(ServerStoppedEvent event) {
+        MaterialDiscoveryState.clear();
     }
 }
