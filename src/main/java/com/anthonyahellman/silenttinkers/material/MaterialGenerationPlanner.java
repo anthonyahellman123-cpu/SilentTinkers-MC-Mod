@@ -14,31 +14,40 @@ public final class MaterialGenerationPlanner {
     public static List<MaterialGenerationRequest> fromDiscovery(UnifiedMaterialDiscovery.Snapshot snapshot) {
         List<MaterialGenerationRequest> requests = new ArrayList<>();
         for (MaterialBridgePlan plan : MaterialBridgePlanner.plan(snapshot)) {
-            requests.add(fromPlan(plan, Optional.empty()));
+            requests.add(fromPlan(snapshot, plan, Optional.empty()));
         }
         requests.sort(Comparator.comparing(request -> request.physicalItem().toString()));
         return List.copyOf(requests);
     }
 
-    /**
-     * Builds a bootstrap request for a material found outside both ecosystems.
-     * The detected tier is converted into fallback stats, with authored
-     * per-material overrides automatically taking precedence.
-     */
     public static MaterialGenerationRequest bootstrap(ResourceLocation physicalItem, int detectedMiningTier) {
         MaterialBridgePlan plan = MaterialBridgePlanner.bootstrap(physicalItem);
         BootstrapMaterialProfile profile = BootstrapMaterialResolver.resolve(physicalItem, detectedMiningTier);
-        return fromPlan(plan, Optional.of(profile));
+        return new MaterialGenerationRequest(plan.physicalItem(), plan.action(), plan.source(), plan.target(),
+                Optional.empty(), Optional.of(profile));
     }
 
-    private static MaterialGenerationRequest fromPlan(
-            MaterialBridgePlan plan,
-            Optional<BootstrapMaterialProfile> bootstrapProfile) {
-        return new MaterialGenerationRequest(
-                plan.physicalItem(),
-                plan.action(),
-                plan.source(),
-                plan.target(),
-                bootstrapProfile);
+    private static MaterialGenerationRequest fromPlan(UnifiedMaterialDiscovery.Snapshot snapshot,
+            MaterialBridgePlan plan, Optional<BootstrapMaterialProfile> bootstrapProfile) {
+        Optional<ResourceLocation> sourceMaterialId = plan.source().flatMap(source ->
+                snapshot.index().get(plan.physicalItem())
+                        .flatMap(candidate -> Optional.ofNullable(candidate.profiles().get(source)))
+                        .map(MaterialProfile::materialId));
+
+        // Canonical representative aliases may not themselves be the alias that
+        // originally produced the plan. Resolve by scanning the source profile's
+        // alias set when direct lookup is insufficient.
+        if (sourceMaterialId.isEmpty() && plan.source().isPresent()) {
+            MaterialProfile.Ecosystem source = plan.source().get();
+            sourceMaterialId = snapshot.bridgeCandidates().stream()
+                    .map(candidate -> candidate.profiles().get(source))
+                    .filter(java.util.Objects::nonNull)
+                    .filter(profile -> snapshot.index().aliases(profile).contains(plan.physicalItem()))
+                    .map(MaterialProfile::materialId)
+                    .findFirst();
+        }
+
+        return new MaterialGenerationRequest(plan.physicalItem(), plan.action(), plan.source(), plan.target(),
+                sourceMaterialId, bootstrapProfile);
     }
 }
