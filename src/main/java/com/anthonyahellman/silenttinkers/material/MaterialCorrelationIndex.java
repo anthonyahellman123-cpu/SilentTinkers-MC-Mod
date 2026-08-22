@@ -3,52 +3,82 @@ package com.anthonyahellman.silenttinkers.material;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.Collection;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Mutable staging index used by discovery adapters.
  *
- * <p>Adapters may discover Silent Gear and Tinkers profiles independently.
- * The index correlates them by a shared physical tag without forcing either
- * ecosystem to surrender its own material ID or behavior.</p>
+ * <p>Discovery is allowed to report several physical aliases for one native
+ * material (for example multiple ingots accepted by a tag-backed recipe).
+ * Aliases are indexed together first; cross-ecosystem correlation only occurs
+ * when both sides actually share a physical item identity.</p>
  */
 public final class MaterialCorrelationIndex {
-    private final Map<ResourceLocation, Candidate> byPhysicalTag = new LinkedHashMap<>();
+    private final Map<ResourceLocation, Candidate> byPhysicalItem = new LinkedHashMap<>();
+    private final Map<ProfileKey, Set<ResourceLocation>> aliasesByProfile = new LinkedHashMap<>();
 
-    public void accept(ResourceLocation physicalTag, MaterialProfile profile) {
-        byPhysicalTag.computeIfAbsent(physicalTag, Candidate::new).put(profile);
+    public void accept(ResourceLocation physicalItem, MaterialProfile profile) {
+        byPhysicalItem.computeIfAbsent(physicalItem, Candidate::new).put(profile);
+        aliasesByProfile.computeIfAbsent(ProfileKey.of(profile), ignored -> new LinkedHashSet<>())
+                .add(physicalItem);
     }
 
-    public Optional<Candidate> get(ResourceLocation physicalTag) {
-        return Optional.ofNullable(byPhysicalTag.get(physicalTag));
+    /** Adds every concrete physical alias discovered for one ecosystem profile. */
+    public void acceptAll(Collection<ResourceLocation> physicalItems, MaterialProfile profile) {
+        for (ResourceLocation physicalItem : physicalItems) {
+            accept(physicalItem, profile);
+        }
+    }
+
+    public Optional<Candidate> get(ResourceLocation physicalItem) {
+        return Optional.ofNullable(byPhysicalItem.get(physicalItem));
     }
 
     public Collection<Candidate> all() {
-        return java.util.List.copyOf(byPhysicalTag.values());
+        return java.util.List.copyOf(byPhysicalItem.values());
+    }
+
+    /** Returns all concrete item aliases seen for a native material profile. */
+    public Set<ResourceLocation> aliases(MaterialProfile profile) {
+        return Set.copyOf(aliasesByProfile.getOrDefault(ProfileKey.of(profile), Set.of()));
+    }
+
+    private record ProfileKey(MaterialProfile.Ecosystem ecosystem, ResourceLocation materialId) {
+        private static ProfileKey of(MaterialProfile profile) {
+            return new ProfileKey(profile.ecosystem(), profile.materialId());
+        }
     }
 
     public static final class Candidate {
-        private final ResourceLocation physicalTag;
+        private final ResourceLocation physicalItem;
         private final Map<MaterialProfile.Ecosystem, MaterialProfile> profiles =
-                new java.util.EnumMap<>(MaterialProfile.Ecosystem.class);
+                new EnumMap<>(MaterialProfile.Ecosystem.class);
 
-        private Candidate(ResourceLocation physicalTag) {
-            this.physicalTag = physicalTag;
+        private Candidate(ResourceLocation physicalItem) {
+            this.physicalItem = physicalItem;
         }
 
         private void put(MaterialProfile profile) {
             MaterialProfile previous = profiles.putIfAbsent(profile.ecosystem(), profile);
             if (previous != null && !previous.materialId().equals(profile.materialId())) {
-                throw new IllegalStateException("Physical tag " + physicalTag
+                throw new IllegalStateException("Physical item " + physicalItem
                         + " maps to multiple " + profile.ecosystem() + " materials: "
                         + previous.materialId() + " and " + profile.materialId());
             }
         }
 
+        public ResourceLocation physicalItem() {
+            return physicalItem;
+        }
+
+        /** Compatibility alias while UnifiedMaterial still names this field itemTag. */
         public ResourceLocation physicalTag() {
-            return physicalTag;
+            return physicalItem;
         }
 
         public Map<MaterialProfile.Ecosystem, MaterialProfile> profiles() {
@@ -65,7 +95,7 @@ public final class MaterialCorrelationIndex {
         }
 
         public UnifiedMaterial toUnified(ResourceLocation canonicalId) {
-            return new UnifiedMaterial(canonicalId, physicalTag, profiles);
+            return new UnifiedMaterial(canonicalId, physicalItem, profiles);
         }
     }
 }
