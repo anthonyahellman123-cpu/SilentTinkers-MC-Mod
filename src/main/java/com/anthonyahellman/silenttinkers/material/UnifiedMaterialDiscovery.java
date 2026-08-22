@@ -42,77 +42,59 @@ public final class UnifiedMaterialDiscovery {
             SilentTinkersMod.LOGGER.warn("[SilentTinkers:AMBIGUOUS] item={} claims={} -- quarantined from generation",
                     candidate.physicalItem(), candidate.claimIds());
         }
-        for (MaterialCorrelationIndex.Candidate candidate : correlated) {
-            SilentTinkersMod.LOGGER.info("[SilentTinkers:CORRELATED] item={} SG={} TCon={}", candidate.physicalItem(),
-                    candidate.profiles().get(MaterialProfile.Ecosystem.SILENT_GEAR).materialId(),
-                    candidate.profiles().get(MaterialProfile.Ecosystem.TINKERS_CONSTRUCT).materialId());
-        }
-        for (MaterialCorrelationIndex.Candidate candidate : bridgeCandidates) {
-            MaterialProfile profile = candidate.profiles().values().iterator().next();
-            SilentTinkersMod.LOGGER.info("[SilentTinkers:BRIDGE_CANDIDATE] item={} source={} material={}",
-                    candidate.physicalItem(), profile.ecosystem(), profile.materialId());
-        }
 
         List<MaterialGenerationRequest> requests = MaterialGenerationPlanner.fromDiscovery(snapshot);
         long actionable = requests.stream().filter(MaterialGenerationRequest::generatesAnything).count();
-        SilentTinkersMod.LOGGER.info("[SilentTinkers:GENERATION_PLAN] total={} actionable={} preserved={} quarantined={}",
+        SilentTinkersMod.LOGGER.info("[SilentTinkers:GENERATION_PLAN] total={} actionable={} preserved={} aliasQuarantined={}",
                 requests.size(), actionable, requests.size() - actionable, ambiguous.size());
 
-        int translated = 0;
-        int tinkersNativeReady = 0;
-        int translationFailed = 0;
-        for (MaterialGenerationRequest request : requests) {
-            if (!request.generatesAnything()) continue;
+        int readyForTinkers = 0;
+        int tinkersSourceReady = 0;
+        int bootstrapPending = 0;
+        int requestQuarantined = 0;
 
-            SilentTinkersMod.LOGGER.info("[SilentTinkers:GENERATE] item={} action={} source={} sourceMaterial={} target={}",
+        for (MaterialGenerationRequest request : requests) {
+            MaterialGenerationEvaluation evaluation = MaterialGenerationEvaluator.evaluate(request);
+            if (evaluation.status() == MaterialGenerationEvaluation.Status.PRESERVED) continue;
+
+            SilentTinkersMod.LOGGER.info(
+                    "[SilentTinkers:EVALUATE] item={} action={} source={} sourceMaterial={} target={} status={} detail={}",
                     request.physicalItem(), request.action(), request.source().map(Enum::name).orElse("NONE"),
                     request.sourceMaterialId().map(Object::toString).orElse("NONE"),
-                    request.target().map(Enum::name).orElse("BOTH"));
+                    request.target().map(Enum::name).orElse("BOTH"), evaluation.status(), evaluation.detail());
 
-            if (request.action() != MaterialBridgePlan.Action.BRIDGE) continue;
-            if (request.source().orElse(null) == MaterialProfile.Ecosystem.TINKERS_CONSTRUCT) {
-                var nativeStats = MaterialStatTranslator.readNativeTinkers(request);
-                if (nativeStats.isPresent()) {
-                    var value = nativeStats.get();
-                    tinkersNativeReady++;
+            switch (evaluation.status()) {
+                case READY_FOR_TINKERS -> {
+                    readyForTinkers++;
+                    TranslatedMaterialStats value = evaluation.translatedStats().orElseThrow();
                     SilentTinkersMod.LOGGER.info(
-                            "[SilentTinkers:TINKERS_NATIVE] item={} sourceMaterial={} headDurability={} miningSpeed={} meleeAttack={} tier={} handleDurability={} handleMiningSpeed={} handleAttackSpeed={} handleDamage={}",
-                            request.physicalItem(), request.sourceMaterialId().map(Object::toString).orElse("NONE"),
-                            value.headDurability(), value.headMiningSpeed(), value.headMeleeAttack(), value.harvestTier(),
-                            value.handleDurabilityModifier(), value.handleMiningSpeedModifier(),
-                            value.handleAttackSpeedModifier(), value.handleDamageModifier());
-                } else {
-                    translationFailed++;
-                    SilentTinkersMod.LOGGER.warn(
-                            "[SilentTinkers:TINKERS_NATIVE_FAILED] item={} sourceMaterial={} -- quarantined from generation",
-                            request.physicalItem(), request.sourceMaterialId().map(Object::toString).orElse("NONE"));
+                            "[SilentTinkers:TRANSLATED] item={} durability={} miningSpeed={} meleeDamage={} attackSpeed={} tier={}",
+                            request.physicalItem(), value.durability(), value.miningSpeed(), value.meleeDamage(),
+                            value.attackSpeed(), value.harvestTier());
                 }
-                continue;
-            }
-
-            var stats = MaterialStatTranslator.translate(request);
-            if (stats.isPresent()) {
-                TranslatedMaterialStats value = stats.get();
-                translated++;
-                SilentTinkersMod.LOGGER.info(
-                        "[SilentTinkers:TRANSLATED] item={} sourceMaterial={} durability={} miningSpeed={} meleeDamage={} attackSpeed={} tier={}",
-                        request.physicalItem(), request.sourceMaterialId().map(Object::toString).orElse("NONE"),
-                        value.durability(), value.miningSpeed(), value.meleeDamage(), value.attackSpeed(), value.harvestTier());
-            } else {
-                translationFailed++;
-                SilentTinkersMod.LOGGER.warn(
-                        "[SilentTinkers:TRANSLATION_FAILED] item={} source={} sourceMaterial={} -- quarantined from generation",
-                        request.physicalItem(), request.source().map(Enum::name).orElse("NONE"),
-                        request.sourceMaterialId().map(Object::toString).orElse("NONE"));
+                case TINKERS_SOURCE_READY -> {
+                    tinkersSourceReady++;
+                    var value = evaluation.tinkersSourceStats().orElseThrow();
+                    SilentTinkersMod.LOGGER.info(
+                            "[SilentTinkers:TINKERS_NATIVE] item={} headDurability={} miningSpeed={} meleeAttack={} tier={} handleDurability={} handleMiningSpeed={} handleAttackSpeed={} handleDamage={}",
+                            request.physicalItem(), value.headDurability(), value.headMiningSpeed(), value.headMeleeAttack(),
+                            value.harvestTier(), value.handleDurabilityModifier(), value.handleMiningSpeedModifier(),
+                            value.handleAttackSpeedModifier(), value.handleDamageModifier());
+                }
+                case BOOTSTRAP_PENDING -> bootstrapPending++;
+                case QUARANTINED -> {
+                    requestQuarantined++;
+                    SilentTinkersMod.LOGGER.warn("[SilentTinkers:REQUEST_QUARANTINED] item={} reason={}",
+                            request.physicalItem(), evaluation.detail());
+                }
+                case PRESERVED -> { }
             }
         }
 
         SilentTinkersMod.LOGGER.info(
-                "[SilentTinkers:TRANSLATION_PLAN] translated={} tinkersNativeReady={} failed={}",
-                translated, tinkersNativeReady, translationFailed);
+                "[SilentTinkers:EVALUATION_PLAN] readyForTinkers={} tinkersSourceReady={} bootstrapPending={} requestQuarantined={} aliasQuarantined={}",
+                readyForTinkers, tinkersSourceReady, bootstrapPending, requestQuarantined, ambiguous.size());
 
-        // Publish only a completely evaluated snapshot. If anything above throws,
-        // lifecycle code can fail closed without exposing a partially scanned state.
         MaterialDiscoveryState.publish(snapshot);
         return snapshot;
     }
