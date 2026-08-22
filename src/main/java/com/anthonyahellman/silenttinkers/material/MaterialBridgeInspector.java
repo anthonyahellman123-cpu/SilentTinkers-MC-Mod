@@ -27,7 +27,7 @@ public final class MaterialBridgeInspector {
         }
         return new Inspection(
                 material.canonicalId(),
-                material.physicalTag(),
+                material.itemTag(),
                 List.copyOf(profiles),
                 material.hasProfile(MaterialProfile.Ecosystem.SILENT_GEAR),
                 material.hasProfile(MaterialProfile.Ecosystem.TINKERS_CONSTRUCT));
