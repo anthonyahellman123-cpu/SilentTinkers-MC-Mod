@@ -73,12 +73,7 @@ public final class SilentMaterialMeltingRecipe implements IMeltingRecipe {
         if (stack.isEmpty()) return Optional.empty();
         ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
         if (itemId == null) return Optional.empty();
-
-        return MaterialDiscoveryState.current().stream()
-                .flatMap(snapshot -> snapshot.evaluations().stream())
-                .filter(MaterialGenerationEvaluation::readyForMutation)
-                .filter(evaluation -> evaluation.request().physicalItem().equals(itemId))
-                .findFirst();
+        return MaterialDiscoveryState.readyForTinkers(itemId);
     }
 
     @Override
