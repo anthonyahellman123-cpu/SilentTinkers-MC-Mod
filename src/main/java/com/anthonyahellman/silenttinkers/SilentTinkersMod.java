@@ -6,6 +6,7 @@ import com.anthonyahellman.silenttinkers.material.AlloyStatSnapshot;
 import com.anthonyahellman.silenttinkers.material.MaterialDiscoveryState;
 import com.anthonyahellman.silenttinkers.material.MaterialIngredient;
 import com.anthonyahellman.silenttinkers.material.UnifiedMaterialDiscovery;
+import com.anthonyahellman.silenttinkers.modifier.CompositeAlloyModifier;
 import com.anthonyahellman.silenttinkers.recipe.CompositePickHeadCastingRecipe;
 import com.anthonyahellman.silenttinkers.registry.ModFluids;
 import com.anthonyahellman.silenttinkers.registry.ModItems;
@@ -27,6 +28,8 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.slf4j.Logger;
 import slimeknights.tconstruct.library.materials.MaterialRegistry;
 import slimeknights.tconstruct.library.modifiers.ModifierEntry;
+import slimeknights.tconstruct.library.modifiers.ModifierHooks;
+import slimeknights.tconstruct.library.modifiers.hook.build.ToolStatsModifierHook;
 import slimeknights.tconstruct.tools.TinkerToolParts;
 import slimeknights.tconstruct.tools.stats.HeadMaterialStats;
 
@@ -79,13 +82,28 @@ public final class SilentTinkersMod {
         List<ModifierEntry> traits = MaterialRegistry.getInstance()
                 .getTraits(CompositePickHeadCastingRecipe.MATERIAL, HeadMaterialStats.ID);
         String expected = MOD_ID + ":composite_alloy";
-        boolean bound = traits.stream().anyMatch(entry -> entry.getId().toString().equals(expected));
-        if (bound) {
-            LOGGER.info("[SilentTinkers:COMPOSITE_TRAIT_BOUND] material={} statType={} traits={}",
-                    CompositePickHeadCastingRecipe.MATERIAL, HeadMaterialStats.ID, traits);
-        } else {
+        ModifierEntry entry = traits.stream()
+                .filter(candidate -> candidate.getId().toString().equals(expected))
+                .findFirst()
+                .orElse(null);
+        if (entry == null) {
             LOGGER.error("[SilentTinkers:COMPOSITE_TRAIT_MISSING] material={} statType={} traits={} -- assembled tools cannot receive dynamic stats until this trait is present",
                     CompositePickHeadCastingRecipe.MATERIAL, HeadMaterialStats.ID, traits);
+            return;
+        }
+
+        Object modifier = entry.getModifier();
+        ToolStatsModifierHook statsHook = entry.getHook(ModifierHooks.TOOL_STATS);
+        boolean modifierClassOk = modifier instanceof CompositeAlloyModifier;
+        boolean hookClassOk = statsHook instanceof CompositeAlloyModifier;
+        if (modifierClassOk && hookClassOk) {
+            LOGGER.info("[SilentTinkers:COMPOSITE_TRAIT_BOUND] material={} statType={} modifierClass={} hookClass={} traits={}",
+                    CompositePickHeadCastingRecipe.MATERIAL, HeadMaterialStats.ID,
+                    modifier.getClass().getName(), statsHook.getClass().getName(), traits);
+        } else {
+            LOGGER.error("[SilentTinkers:COMPOSITE_HOOK_MISMATCH] material={} statType={} modifierClass={} hookClass={} traits={} -- trait ID exists but does not resolve to the expected tool-stat hook",
+                    CompositePickHeadCastingRecipe.MATERIAL, HeadMaterialStats.ID,
+                    modifier.getClass().getName(), statsHook.getClass().getName(), traits);
         }
     }
 
