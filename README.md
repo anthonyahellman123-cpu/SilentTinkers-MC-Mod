@@ -19,12 +19,13 @@ available after normal Tinkers assembly and modification.
 
 ## First vertical slice
 
-1. Read any valid Silent Gear compound alloy ingot. **Complete**
-2. Convert its composition into a canonical, versioned representation. **Complete**
+1. Read valid Silent Gear material/alloy identity. **Complete**
+2. Convert composition into a canonical, versioned representation. **Complete**
 3. Preserve that representation through melting and casting. **Complete**
 4. Create one universal Tinkers pick head carrying the representation. **Complete**
-5. Apply Silent Gear's evaluated stats to a completed test tool. **Implemented; in-game validation pending**
-6. Forward thresholded native Tinkers/addon traits. **Implemented; in-game validation pending**
+5. Apply Silent Gear's evaluated stats to a completed Tinkers tool. **Validated in game**
+6. Preserve normal Tinkers multipart stat math around the dynamic head. **Validated in game**
+7. Forward thresholded native Tinkers/addon traits. **Implemented; broader in-game validation pending**
 
 Equivalent ratios share the same compact fingerprint. Runtime-created alloys do
 not register new fluids or materials globally; one carrier fluid holds a bounded
@@ -41,46 +42,54 @@ composition payload instead.
   fluid to the cast result. Tinkers 3.11 exposes both inventory-aware melting
   output and casting-fluid NBT, so this path preserves identity through tanks.
 - At melt time, `SilentGearStatReader` asks Silent Gear's public material API
-  for the finished ingot's evaluated head stats. This automatically respects
-  its alloy weighting, grade, starcharge, and compatible addon calculations.
+  for the finished material's evaluated head stats. This automatically respects
+  native Silent Gear evaluation instead of reimplementing its formulas.
 - The evaluated snapshot travels in the same bounded payload and is encoded in
   the Tinkers material variant on the cast part. The composite modifier replaces
   the neutral material baseline with those stats during tool construction.
 - For ingredients that also exist in Tinkers or an installed Tinkers addon, the
   modifier asks Tinkers' live material registry for the real head traits. The
   addon that owns a trait therefore remains responsible for its implementation.
-  Resolution tries the exact ID, the built-in `tconstruct` equivalent, and then
-  a cross-addon path match only when that path is unique in the material registry.
+
+## Validated Elementium path
+
+A Botania Elementium test now proves the complete numeric bridge:
+
+`botania:elementium_ingot`
+→ Silent Gear material `silentcompat:elementium`
+→ dynamic molten composite payload
+→ synthetic composite pick head
+→ normal Tinkers pickaxe assembly
+→ dynamic head stats applied by `CompositeAlloyModifier`.
+
+The encoded Silent Gear head snapshot was:
+
+- durability 720
+- mining speed 6.2
+- melee damage 2.0
+- attack speed 0.0
+- harvest tier diamond
+
+The completed pickaxe kept that encoded variant, bound the composite modifier,
+and finished with normal Tinkers multipart math at durability 540, mining speed
+4.96, melee damage 3.6000001, attack speed 1.2, and Diamond harvest tier.
+The runtime log emitted both `[SilentTinkers:COMPOSITE_STATS_APPLIED]` and
+`[SilentTinkers:COMPOSITE_TOOL_OBSERVED]`, confirming the same result from the
+server-side stat hook and the finished client tool.
 
 ## Current in-game validation
 
-The alpha produces both a diagnostic `Composite Alloy Sample` and a real
-`tconstruct:pick_head`. A real Botania Elementium test has already confirmed the
-runtime discovery, Silent Gear stat read, dynamic melting, fluid payload, sample
-payload, and encoded pick-head material variant. The remaining active validation
-is the final Tinkers tool-rebuild handoff that attaches the composite modifier
-and applies the encoded head stats to the assembled tool.
-
 1. Install Silent Tinkers with the compatibility baseline mods listed above.
-2. Make a `silentgear:alloy_ingot` through Silent Gear's normal alloy system, or
-   use a discovered one-unit material form such as a supported ingot/gem/crystal.
-3. Melt one supported material unit in a Tinkers smeltery or melter at the
-   required temperature.
-4. Pour one ingot (90 mB) into an empty casting table with no cast. Hover the
-   resulting sample; its tooltip should list the canonical material IDs,
-   percentages, composition fingerprint, and the evaluated numeric stats.
-5. For the real-part test, put a reusable pick head cast on the table and pour
-   two ingots (180 mB). The output should be a purple `tconstruct:pick_head`
-   whose `Material` NBT begins with `silenttinkers:composite_alloy#v1.`. Its
-   development tooltip also shows the encoded dynamic payload directly.
-6. Build a normal Tinkers pickaxe with that head. Hovering a finished tool that
-   still contains the composite material shows a development diagnostic with:
-   composite modifier binding, encoded-variant presence, and final Tinkers tool
-   stats. The same observation is logged once as
-   `[SilentTinkers:COMPOSITE_TOOL_OBSERVED]`.
-7. Check `latest.log` for `[SilentTinkers:COMPOSITE_TRAIT_BOUND]`,
-   `[SilentTinkers:COMPOSITE_STATS_APPLIED]`, and the assembled-tool observation.
-   Missing or mismatch diagnostics identify the failed handoff explicitly.
+2. Use a discovered one-unit Silent Gear material form such as a supported
+   ingot/gem/crystal, or a normal Silent Gear compound alloy ingot.
+3. Melt the supported material in a Tinkers smeltery or melter.
+4. Pour into the diagnostic sample or a reusable pick-head cast.
+5. Assemble the resulting composite pick head into a normal Tinkers pickaxe.
+6. `/silenttinkers status` reports scan health, bridge counts, composite hook
+   binding, and whether dynamic assembled-tool stats have actually executed in
+   the current server session.
+7. `/silenttinkers inspect` reports how SilentTinkers currently interprets the
+   material item held in the player's main hand.
 
 The first runtime bridge intentionally does **not** treat ore blocks, storage
 blocks, nuggets, plates, planks, or arbitrary components as one ingot. Only
@@ -91,20 +100,21 @@ for the value of a single ingot.
 ## Server diagnostics
 
 Silent Tinkers publishes an immutable material-plan snapshot after each complete
-scan. Two commands expose the useful parts without requiring Java knowledge:
+scan. Startup emits `[SilentTinkers:STARTUP_SUMMARY]` with a deterministic short
+plan fingerprint. A matching fingerprint across restarts means the logical
+bridge plan is unchanged.
 
-- `/silenttinkers status` shows the current plan fingerprint, Silent Gear and
-  Tinkers material counts, preserved compatibility, bridge counts, runtime-ready
-  materials, deferred physical forms, bootstrap work, and quarantined requests.
-- `/silenttinkers inspect` inspects the material item held in the player's main
-  hand. It shows the selected bridge action, source ecosystem/material ID,
-  target, evaluation status/detail, translated head stats when available, and
-  whether that exact physical form is active in the dynamic smeltery bridge.
+`/silenttinkers status` currently distinguishes three different ideas that are
+important during pack debugging:
 
-Startup also emits `[SilentTinkers:STARTUP_SUMMARY]` with the same short plan
-fingerprint. If two restarts have the same fingerprint, their logical bridge
-plan is identical even if unrelated log ordering changes. A mod/material change
-that alters the plan changes the fingerprint.
+- the discovery/evaluation plan exists,
+- the static composite Tinkers hook is bound,
+- a real assembled composite tool has executed the dynamic stat hook this
+  server session.
+
+That last state is intentionally a runtime latch rather than an assumption: a
+healthy fresh server can say `NOT YET OBSERVED` until somebody actually builds
+or loads a composite tool that causes Tinkers to rebuild its stats.
 
 Default trait gates are 25% for the first trait, 50% for the first two traits,
 and 75% for the complete trait package. Set all three values to `0` for the
@@ -128,4 +138,4 @@ pipe implementation.
 Every push runs `./gradlew build` on Java 17 in GitHub Actions and uploads the
 reobfuscated jar as a workflow artifact. A green build proves compilation,
 resource processing, tests, and Forge reobfuscation; Minecraft behavior still
-requires the short in-game validation above.
+requires in-game validation for new runtime paths.
