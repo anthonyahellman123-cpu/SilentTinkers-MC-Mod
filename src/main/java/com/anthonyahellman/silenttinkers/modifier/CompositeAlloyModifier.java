@@ -47,12 +47,6 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
         hookBuilder.addHook(this, ModifierHooks.TOOL_STATS, ModifierHooks.MODIFIER_TRAITS);
     }
 
-    /**
-     * Adds the real registered Tinkers traits for alloy ingredients that also
-     * exist as Tinkers materials. This deliberately asks Tinkers' live material
-     * registry instead of copying trait names, so addon modifier behavior stays
-     * owned by the addon that registered it.
-     */
     @Override
     public void addTraits(IToolContext context, ModifierEntry modifier, TraitBuilder builder,
                           boolean firstEncounter) {
@@ -97,16 +91,11 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
             return Optional.of(exact);
         }
 
-        // Silent Gear's built-in IDs commonly use the silentgear namespace,
-        // while the equivalent Tinkers materials use tconstruct with the same path.
         MaterialId tconstruct = new MaterialId("tconstruct", sourceId.getPath());
         if (registry.getMaterial(tconstruct) != IMaterial.UNKNOWN) {
             return Optional.of(tconstruct);
         }
 
-        // Cross-addon bridges often retain the material path but use their own
-        // namespace. Accept that handshake only when the path is unique, so a
-        // pack with two unrelated materials named alike never gets a random trait.
         List<MaterialId> samePath = registry.getAllMaterials().stream()
                 .map(IMaterial::getIdentifier)
                 .filter(id -> id.getPath().equals(sourceId.getPath()))
@@ -155,7 +144,7 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
         }
 
         if (!foundComposite) {
-            String materials = context.getMaterials().stream()
+            String materials = context.getMaterials().getList().stream()
                     .map(material -> material.getVariant().toString())
                     .collect(Collectors.joining(","));
             if (LOGGED_CONTEXTS_WITHOUT_COMPOSITE.add(materials)) {
