@@ -2,6 +2,7 @@ package com.anthonyahellman.silenttinkers.command;
 
 import com.anthonyahellman.silenttinkers.material.MaterialDiscoveryState;
 import com.anthonyahellman.silenttinkers.material.MaterialGenerationEvaluation;
+import com.anthonyahellman.silenttinkers.material.MaterialPlanFingerprint;
 import com.anthonyahellman.silenttinkers.material.TranslatedMaterialStats;
 import com.anthonyahellman.silenttinkers.material.UnifiedMaterialDiscovery;
 import com.mojang.brigadier.CommandDispatcher;
@@ -47,9 +48,11 @@ public final class SilentTinkersCommands {
         long quarantined = count(snapshot, MaterialGenerationEvaluation.Status.QUARANTINED);
         int runtimeReady = MaterialDiscoveryState.readyForTinkersCount();
         long deferred = Math.max(0L, readyForTinkers - runtimeReady);
+        String fingerprint = MaterialPlanFingerprint.of(snapshot);
 
         source.sendSuccess(() -> Component.literal(
-                "SilentTinkers: SG " + snapshot.silentGear().materials()
+                "SilentTinkers plan " + fingerprint
+                        + " | SG " + snapshot.silentGear().materials()
                         + " | TCon " + snapshot.tinkers().materials()
                         + " | correlated aliases " + snapshot.correlatedPhysicalItems()), false);
         source.sendSuccess(() -> Component.literal(
