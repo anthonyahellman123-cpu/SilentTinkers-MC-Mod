@@ -2,12 +2,15 @@ package com.anthonyahellman.silenttinkers.material;
 
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Test;
+import slimeknights.tconstruct.library.materials.definition.MaterialId;
+import slimeknights.tconstruct.library.materials.definition.MaterialVariantId;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class AlloyVariantCodecTest {
@@ -30,6 +33,27 @@ final class AlloyVariantCodecTest {
         assertTrue(decodedStats.isPresent());
         assertEquals(stats, decodedStats.orElseThrow());
         assertEquals(0, AlloyVariantCodec.decodeStarChargeLevel(encoded));
+    }
+
+    @Test
+    void encodedPayloadSurvivesTinkersMaterialVariantStringRoundTrip() {
+        ResourceLocation elementium = new ResourceLocation("silentcompat", "elementium");
+        Map<ResourceLocation, Long> ingredients = new LinkedHashMap<>();
+        ingredients.put(elementium, 1L);
+        AlloyComposition composition = AlloyComposition.of(ingredients);
+        AlloyStatSnapshot stats = new AlloyStatSnapshot(
+                720.0f, 6.2f, 2.0f, 0.0f,
+                new ResourceLocation("minecraft", "diamond"));
+
+        String encoded = AlloyVariantCodec.encode(composition, 0, Optional.of(stats));
+        MaterialId base = new MaterialId("silenttinkers", "composite_alloy");
+        MaterialVariantId created = MaterialVariantId.create(base, encoded);
+        MaterialVariantId reparsed = MaterialVariantId.tryParse(created.toString());
+
+        assertNotNull(reparsed);
+        assertTrue(created.sameVariant(reparsed));
+        assertEquals(composition.fingerprint(), AlloyVariantCodec.decode(reparsed.getVariant()).fingerprint());
+        assertEquals(stats, AlloyVariantCodec.decodeStats(reparsed.getVariant()).orElseThrow());
     }
 
     @Test
