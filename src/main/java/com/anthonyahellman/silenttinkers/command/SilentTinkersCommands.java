@@ -4,6 +4,7 @@ import com.anthonyahellman.silenttinkers.material.CompositeBridgeHealth;
 import com.anthonyahellman.silenttinkers.material.MaterialDiscoveryState;
 import com.anthonyahellman.silenttinkers.material.MaterialGenerationEvaluation;
 import com.anthonyahellman.silenttinkers.material.MaterialPlanFingerprint;
+import com.anthonyahellman.silenttinkers.material.RuntimeBridgeHealth;
 import com.anthonyahellman.silenttinkers.material.TranslatedMaterialStats;
 import com.anthonyahellman.silenttinkers.material.UnifiedMaterialDiscovery;
 import com.mojang.brigadier.CommandDispatcher;
@@ -23,16 +24,12 @@ import java.util.List;
 public final class SilentTinkersCommands {
     private SilentTinkersCommands() {}
 
-    public static void register(RegisterCommandsEvent event) {
-        register(event.getDispatcher());
-    }
+    public static void register(RegisterCommandsEvent event) { register(event.getDispatcher()); }
 
     static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("silenttinkers")
-                .then(Commands.literal("status")
-                        .executes(context -> showStatus(context.getSource())))
-                .then(Commands.literal("inspect")
-                        .executes(context -> inspectHeldItem(context.getSource()))));
+                .then(Commands.literal("status").executes(context -> showStatus(context.getSource())))
+                .then(Commands.literal("inspect").executes(context -> inspectHeldItem(context.getSource()))));
     }
 
     private static int showStatus(CommandSourceStack source) {
@@ -64,8 +61,11 @@ public final class SilentTinkersCommands {
         source.sendSuccess(() -> Component.literal(
                 "TCon→SG ready " + tinkersSourceReady
                         + " | bootstrap pending " + bootstrapPending
-                        + " | quarantined " + quarantined
-                        + " | composite hook " + CompositeBridgeHealth.status()), false);
+                        + " | quarantined " + quarantined), false);
+        source.sendSuccess(() -> Component.literal(
+                "Composite hook " + CompositeBridgeHealth.status()
+                        + " | assembled-tool stats "
+                        + (RuntimeBridgeHealth.compositeStatsApplied() ? "VALIDATED THIS SESSION" : "NOT YET OBSERVED")), false);
         return 1;
     }
 
@@ -101,9 +101,7 @@ public final class SilentTinkersCommands {
                             + " | source " + request.source().map(Enum::name).orElse("NONE")
                             + " | material " + request.sourceMaterialId().map(Object::toString).orElse("NONE")
                             + " | target " + request.target().map(Enum::name).orElse("BOTH")), false);
-            if (!evaluation.detail().isBlank()) {
-                source.sendSuccess(() -> Component.literal("Detail: " + evaluation.detail()), false);
-            }
+            if (!evaluation.detail().isBlank()) source.sendSuccess(() -> Component.literal("Detail: " + evaluation.detail()), false);
             evaluation.translatedStats().ifPresent(stats -> sendTranslatedStats(source, stats));
         }
 
@@ -122,8 +120,7 @@ public final class SilentTinkersCommands {
                         + " | tier " + stats.harvestTier()), false);
     }
 
-    private static long count(UnifiedMaterialDiscovery.Snapshot snapshot,
-                              MaterialGenerationEvaluation.Status status) {
+    private static long count(UnifiedMaterialDiscovery.Snapshot snapshot, MaterialGenerationEvaluation.Status status) {
         return snapshot.evaluations().stream().filter(evaluation -> evaluation.status() == status).count();
     }
 }
