@@ -58,6 +58,10 @@ public final class CompositeTooltipEvents {
                         .withStyle(ChatFormatting.DARK_AQUA));
             });
             AlloyPayload.readStats(stack).ifPresent(stats -> appendDynamicStats(event, stats));
+            int starChargeLevel = AlloyPayload.readStarChargeLevel(stack);
+            event.getToolTip().add(Component.literal("Starcharge: "
+                            + (starChargeLevel > 0 ? "level " + starChargeLevel : "uncharged"))
+                    .withStyle(starChargeLevel > 0 ? ChatFormatting.AQUA : ChatFormatting.DARK_GRAY));
         });
     }
 
@@ -84,6 +88,10 @@ public final class CompositeTooltipEvents {
         Optional<SourceVisualIdentity> visualSource = Optional.empty();
         int visualColor = SourceVisualColorResolver.FALLBACK_ARGB;
         try {
+            int starChargeLevel = AlloyVariantCodec.decodeStarChargeLevel(variant);
+            event.getToolTip().add(Component.literal("Starcharge: "
+                            + (starChargeLevel > 0 ? "level " + starChargeLevel : "uncharged"))
+                    .withStyle(starChargeLevel > 0 ? ChatFormatting.AQUA : ChatFormatting.DARK_GRAY));
             encodedStats = AlloyVariantCodec.decodeStats(variant);
             visualSource = AlloyVariantCodec.decodeVisualSource(variant);
             Optional<SourceVisualIdentity> observedVisualSource = visualSource;

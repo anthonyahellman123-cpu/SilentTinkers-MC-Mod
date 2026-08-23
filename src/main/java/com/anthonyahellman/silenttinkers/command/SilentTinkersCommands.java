@@ -5,6 +5,7 @@ import com.anthonyahellman.silenttinkers.material.MaterialDiscoveryState;
 import com.anthonyahellman.silenttinkers.material.MaterialGenerationEvaluation;
 import com.anthonyahellman.silenttinkers.material.MaterialPlanFingerprint;
 import com.anthonyahellman.silenttinkers.material.RuntimeBridgeHealth;
+import com.anthonyahellman.silenttinkers.material.StarChargeBridgeHealth;
 import com.anthonyahellman.silenttinkers.material.TranslatedMaterialStats;
 import com.anthonyahellman.silenttinkers.material.UnifiedMaterialDiscovery;
 import com.mojang.brigadier.CommandDispatcher;
@@ -66,6 +67,8 @@ public final class SilentTinkersCommands {
                 "Composite hook " + CompositeBridgeHealth.status()
                         + " | assembled-tool stats "
                         + (RuntimeBridgeHealth.compositeStatsApplied() ? "VALIDATED THIS SESSION" : "NOT YET OBSERVED")), false);
+        source.sendSuccess(() -> Component.literal(
+                "Native starlight charger bridge " + StarChargeBridgeHealth.status()), false);
         return 1;
     }
 

@@ -28,6 +28,7 @@ Tinkers part instead of being re-authored as a separate fake material.
 7. Forward thresholded native Tinkers/addon traits. **Implemented; broader in-game validation pending**
 8. Preserve the original source item's visual identity metadata across conversion and tool assembly. **Validated in game**
 9. Derive composite fluid tint from the preserved source item's actual client rendering data. **Implemented; in-game validation pending**
+10. Extend Silent Gear's native starlight charger to composite Tinkers parts/tools. **Implemented; in-game validation pending**
 
 Equivalent ratios share the same compact fingerprint. Runtime-created alloys do
 not register new fluids or materials globally; one carrier fluid holds a bounded
@@ -164,9 +165,44 @@ traits but still contribute to Silent Gear's evaluated numeric stats.
 
 Starcharge an alloy ingot before melting to test the charged path. Silent Gear's
 evaluated charged stats and the charge level are both preserved through fluid,
-part, and final tool identity. Directly inserting a Tinkers part into Silent
-Gear's starcharger is not yet supported because Silent Gear rejects items that
-are not its own material instances before charging begins.
+part, and final tool identity.
+
+## Native starlight charger bridge
+
+SilentTinkers now narrowly extends Silent Gear's existing starlight charger so
+it can accept a valid composite Tinkers part or assembled tool. Silent Gear
+continues to own all gameplay rules: the multiblock tier, nighttime sky access,
+catalyst, stored starlight, drain rate, and normal work-time calculation.
+
+Before the charger accepts an item, SilentTinkers requires every composite
+variant to be decodable, uncharged, and backed by a reconstructable source item
+that Silent Gear still recognizes as a material. It preflights all three native
+charge levels and refuses the item if Silent Gear cannot recalculate the charged
+stats or if the rewritten variant would exceed the bounded payload. This keeps
+malformed and unsupported tools out of the machine instead of consuming their
+catalyst and producing a partially modified result.
+
+On completion, the bridge applies Silent Gear's real `STARCHARGED` material
+modifier to the reconstructed source, asks Silent Gear to evaluate the charged
+stats, replaces the composite material variant, and invokes Tinkers' normal tool
+stat rebuild. It does not approximate the starcharge formula.
+
+In-game validation:
+
+1. Use a newly cast uncharged composite pick head or a completed Tinkers tool
+   containing that head. Its diagnostic tooltip should say `Starcharge: uncharged`.
+2. Insert it into Silent Gear's starlight charger with a valid catalyst and a
+   completed charger structure. The machine should use its normal progress and
+   starlight rules.
+3. The output tooltip should say `Starcharge: level N`, retain the same source
+   identity/color, and display newly evaluated encoded head stats.
+4. For a completed tool, confirm the final Tinkers stats changed while its other
+   parts and modifiers remained intact.
+5. `/silenttinkers status` should report
+   `Native starlight charger bridge APPLIED` after the first successful result.
+
+Already charged composites are intentionally rejected, matching Silent Gear's
+native material behavior rather than allowing repeated or tier-up charging.
 
 Do not mix a second composition into a tank already holding composite alloy.
 The intended behavior is for differently tagged fluid stacks to remain

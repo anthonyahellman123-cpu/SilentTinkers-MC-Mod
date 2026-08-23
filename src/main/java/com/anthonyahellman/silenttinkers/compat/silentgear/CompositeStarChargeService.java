@@ -6,6 +6,7 @@ import com.anthonyahellman.silenttinkers.material.AlloyPayload;
 import com.anthonyahellman.silenttinkers.material.AlloyStatSnapshot;
 import com.anthonyahellman.silenttinkers.material.AlloyVariantCodec;
 import com.anthonyahellman.silenttinkers.material.SourceVisualIdentity;
+import com.anthonyahellman.silenttinkers.material.StarChargeBridgeHealth;
 import com.anthonyahellman.silenttinkers.recipe.CompositePickHeadCastingRecipe;
 import net.minecraft.world.item.ItemStack;
 import net.silentchaos512.gear.api.GearApi;
@@ -21,6 +22,8 @@ import slimeknights.tconstruct.library.tools.part.IMaterialItem;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * Adapts SilentTinkers' bounded material variant to Silent Gear's native
@@ -29,6 +32,9 @@ import java.util.Optional;
  * it how to read and rewrite a composite Tinkers material.
  */
 public final class CompositeStarChargeService {
+    private static final int MAX_NATIVE_CHARGE_LEVEL = 3;
+    private static final ConcurrentMap<String, Boolean> REWRITE_VALIDATION = new ConcurrentHashMap<>();
+
     private CompositeStarChargeService() {}
 
     public static boolean isComposite(ItemStack stack) {
@@ -43,6 +49,8 @@ public final class CompositeStarChargeService {
                 if (AlloyVariantCodec.decodeStarChargeLevel(variant) > 0) return false;
                 ItemStack source = sourceStack(variant);
                 if (source.isEmpty() || !GearApi.isMaterial(source)) return false;
+                if (!REWRITE_VALIDATION.computeIfAbsent(variant,
+                        CompositeStarChargeService::validateEveryNativeChargeLevel)) return false;
             } catch (IllegalArgumentException | LinkageError exception) {
                 return false;
             }
@@ -106,11 +114,26 @@ public final class CompositeStarChargeService {
                 return true;
             }
         } catch (RuntimeException | LinkageError exception) {
+            StarChargeBridgeHealth.markFailed();
             SilentTinkersMod.LOGGER.error(
                     "[SilentTinkers:STARCHARGE_FAILED] item={} level={} -- composite output was left unchanged",
                     output.getItem(), level, exception);
         }
         return false;
+    }
+
+    private static boolean validateEveryNativeChargeLevel(String variant) {
+        try {
+            for (int level = 1; level <= MAX_NATIVE_CHARGE_LEVEL; level++) {
+                chargeVariant(MaterialVariantId.create(CompositePickHeadCastingRecipe.MATERIAL, variant), level);
+            }
+            return true;
+        } catch (RuntimeException | LinkageError exception) {
+            SilentTinkersMod.LOGGER.warn(
+                    "[SilentTinkers:STARCHARGE_INELIGIBLE] composite variant cannot be safely rewritten at every native charge level",
+                    exception);
+            return false;
+        }
     }
 
     private static MaterialVariantId chargeVariant(MaterialVariantId current, int level) {
@@ -166,6 +189,7 @@ public final class CompositeStarChargeService {
     }
 
     private static void logSuccess(ItemStack output, int level, int materials) {
+        StarChargeBridgeHealth.markApplied();
         SilentTinkersMod.LOGGER.info(
                 "[SilentTinkers:STARCHARGE_APPLIED] item={} level={} compositeMaterials={} statsRebuilt=true",
                 output.getItem(), level, materials);

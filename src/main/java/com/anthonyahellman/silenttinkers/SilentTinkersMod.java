@@ -5,6 +5,7 @@ import com.anthonyahellman.silenttinkers.config.SilentTinkersConfig;
 import com.anthonyahellman.silenttinkers.material.CompositeBridgeHealth;
 import com.anthonyahellman.silenttinkers.material.MaterialDiscoveryState;
 import com.anthonyahellman.silenttinkers.material.RuntimeBridgeHealth;
+import com.anthonyahellman.silenttinkers.material.StarChargeBridgeHealth;
 import com.anthonyahellman.silenttinkers.material.UnifiedMaterialDiscovery;
 import com.anthonyahellman.silenttinkers.modifier.CompositeAlloyModifier;
 import com.anthonyahellman.silenttinkers.recipe.CompositePickHeadCastingRecipe;
@@ -62,6 +63,7 @@ public final class SilentTinkersMod {
             MaterialDiscoveryState.clear();
             CompositeBridgeHealth.clear();
             RuntimeBridgeHealth.clear();
+            StarChargeBridgeHealth.clear();
             LOGGER.error("[SilentTinkers:SCAN_FAILED] Material discovery failed; automatic bridging disabled until a later successful scan", exception);
         }
     }
@@ -106,5 +108,6 @@ public final class SilentTinkersMod {
         MaterialDiscoveryState.clear();
         CompositeBridgeHealth.clear();
         RuntimeBridgeHealth.clear();
+        StarChargeBridgeHealth.clear();
     }
 }
