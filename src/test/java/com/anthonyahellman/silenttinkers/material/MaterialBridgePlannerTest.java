@@ -18,8 +18,6 @@ class MaterialBridgePlannerTest {
         MaterialProfile sg = profile(MaterialProfile.Ecosystem.SILENT_GEAR, "silentcompat:bronze");
         MaterialProfile tc = profile(MaterialProfile.Ecosystem.TINKERS_CONSTRUCT, "tconstruct:bronze");
 
-        // The ingot proves real native compatibility. A block alias exists only
-        // on Silent Gear and must not produce a duplicate bridge plan.
         index.accept(id("test:bronze_ingot"), sg);
         index.accept(id("test:bronze_ingot"), tc);
         index.accept(id("test:bronze_block"), sg);
@@ -40,9 +38,6 @@ class MaterialBridgePlannerTest {
 
         index.accept(id("test:wood_item"), sg);
         index.accept(id("test:wood_item"), tcWood);
-
-        // Looks attractive to canonical selection because of its name but is
-        // multi-claimed on Tinkers and therefore quarantined.
         index.accept(id("test:ingot_ambiguous"), sg);
         index.accept(id("test:ingot_ambiguous"), tcWood);
         index.accept(id("test:ingot_ambiguous"), tcBamboo);
@@ -53,6 +48,27 @@ class MaterialBridgePlannerTest {
         assertEquals(MaterialBridgePlan.Action.PRESERVE, plans.get(0).action());
         assertEquals(id("test:wood_item"), plans.get(0).physicalItem());
         assertFalse(plans.stream().anyMatch(plan -> plan.physicalItem().equals(id("test:ingot_ambiguous"))));
+    }
+
+    @Test
+    void bridgePlanCarriesSourceIdentityWithoutReverseAliasLookup() {
+        MaterialCorrelationIndex index = new MaterialCorrelationIndex();
+        MaterialProfile sg = profile(MaterialProfile.Ecosystem.SILENT_GEAR, "silentcompat:elementium");
+
+        // Multiple aliases exercise canonical selection. The plan must still
+        // carry the authoritative material ID directly from discovery.
+        index.accept(id("botania:elementium_block"), sg);
+        index.accept(id("botania:elementium_ingot"), sg);
+
+        List<MaterialBridgePlan> plans = MaterialBridgePlanner.plan(snapshot(index));
+
+        assertEquals(1, plans.size());
+        MaterialBridgePlan plan = plans.get(0);
+        assertEquals(MaterialBridgePlan.Action.BRIDGE, plan.action());
+        assertEquals(id("botania:elementium_ingot"), plan.physicalItem());
+        assertEquals(MaterialProfile.Ecosystem.SILENT_GEAR, plan.source().orElseThrow());
+        assertEquals(id("silentcompat:elementium"), plan.sourceMaterialId().orElseThrow());
+        assertEquals(MaterialProfile.Ecosystem.TINKERS_CONSTRUCT, plan.target().orElseThrow());
     }
 
     private static UnifiedMaterialDiscovery.Snapshot snapshot(MaterialCorrelationIndex index) {
