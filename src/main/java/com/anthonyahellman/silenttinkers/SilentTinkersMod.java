@@ -2,6 +2,7 @@ package com.anthonyahellman.silenttinkers;
 
 import com.anthonyahellman.silenttinkers.command.SilentTinkersCommands;
 import com.anthonyahellman.silenttinkers.config.SilentTinkersConfig;
+import com.anthonyahellman.silenttinkers.material.CompositeBridgeHealth;
 import com.anthonyahellman.silenttinkers.material.MaterialDiscoveryState;
 import com.anthonyahellman.silenttinkers.material.UnifiedMaterialDiscovery;
 import com.anthonyahellman.silenttinkers.modifier.CompositeAlloyModifier;
@@ -60,6 +61,7 @@ public final class SilentTinkersMod {
             validateCompositeTraitBinding();
         } catch (RuntimeException | LinkageError exception) {
             MaterialDiscoveryState.clear();
+            CompositeBridgeHealth.clear();
             LOGGER.error("[SilentTinkers:SCAN_FAILED] Material discovery failed; automatic bridging disabled until a later successful scan", exception);
         }
     }
@@ -77,6 +79,7 @@ public final class SilentTinkersMod {
                 .findFirst()
                 .orElse(null);
         if (entry == null) {
+            CompositeBridgeHealth.set(CompositeBridgeHealth.Status.TRAIT_MISSING);
             LOGGER.error("[SilentTinkers:COMPOSITE_TRAIT_MISSING] material={} statType={} traits={} -- assembled tools cannot receive dynamic stats until this trait is present",
                     CompositePickHeadCastingRecipe.MATERIAL, HeadMaterialStats.ID, traits);
             return;
@@ -87,10 +90,12 @@ public final class SilentTinkersMod {
         boolean modifierClassOk = modifier instanceof CompositeAlloyModifier;
         boolean hookClassOk = statsHook instanceof CompositeAlloyModifier;
         if (modifierClassOk && hookClassOk) {
+            CompositeBridgeHealth.set(CompositeBridgeHealth.Status.BOUND);
             LOGGER.info("[SilentTinkers:COMPOSITE_TRAIT_BOUND] material={} statType={} modifierClass={} hookClass={} traits={}",
                     CompositePickHeadCastingRecipe.MATERIAL, HeadMaterialStats.ID,
                     modifier.getClass().getName(), statsHook.getClass().getName(), traits);
         } else {
+            CompositeBridgeHealth.set(CompositeBridgeHealth.Status.HOOK_MISMATCH);
             LOGGER.error("[SilentTinkers:COMPOSITE_HOOK_MISMATCH] material={} statType={} modifierClass={} hookClass={} traits={} -- trait ID exists but does not resolve to the expected tool-stat hook",
                     CompositePickHeadCastingRecipe.MATERIAL, HeadMaterialStats.ID,
                     modifier.getClass().getName(), statsHook.getClass().getName(), traits);
@@ -99,5 +104,6 @@ public final class SilentTinkersMod {
 
     private void onServerStopped(ServerStoppedEvent event) {
         MaterialDiscoveryState.clear();
+        CompositeBridgeHealth.clear();
     }
 }
