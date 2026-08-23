@@ -29,6 +29,10 @@ public final class CompositeAlloySampleItem extends Item {
                 tooltip.add(Component.literal(String.format("%s: %.1f%%", ingredient.materialId(), percent))
                         .withStyle(ChatFormatting.GRAY));
             }
+            AlloyPayload.readVisualSource(stack).ifPresent(visual -> tooltip.add(
+                    Component.literal("Visual source: " + visual.itemId()
+                                    + (visual.itemTag().isPresent() ? " (dynamic tag preserved)" : ""))
+                            .withStyle(ChatFormatting.AQUA)));
             int starChargeLevel = AlloyPayload.readStarChargeLevel(stack);
             if (starChargeLevel > 0) {
                 tooltip.add(Component.translatable("tooltip.silenttinkers.starcharged", starChargeLevel)
