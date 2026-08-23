@@ -20,6 +20,7 @@ import slimeknights.tconstruct.library.recipe.FluidValues;
 import slimeknights.tconstruct.library.recipe.TinkerRecipeTypes;
 import slimeknights.tconstruct.library.recipe.casting.AbstractCastingRecipe;
 import slimeknights.tconstruct.library.recipe.casting.ICastingContainer;
+import slimeknights.tconstruct.library.tools.part.IMaterialItem;
 import slimeknights.tconstruct.tools.TinkerToolParts;
 
 /** First real Tinkers part produced from a dynamic Silent Gear alloy. */
@@ -58,8 +59,25 @@ public final class CompositePickHeadCastingRecipe extends AbstractCastingRecipe 
             MaterialVariantId variant = MaterialVariantId.create(
                     MATERIAL, AlloyVariantCodec.encode(
                             composition, starChargeLevel, AlloyPayload.readStats(inventory.getFluidTag())));
-            ItemStack part = TinkerToolParts.pickHead.get().withMaterial(variant);
+
+            // This is a deliberately synthetic MaterialVariantId. Tinkers' normal
+            // withMaterial() path validates a part's material before writing it.
+            // The base composite material is valid, but forcing the known-safe
+            // variant here removes validation as a place where our payload could
+            // be silently collapsed back to the plain composite material.
+            ItemStack part = TinkerToolParts.pickHead.get().withMaterialForDisplay(variant);
             AlloyPayload.write(part, composition, starChargeLevel, AlloyPayload.readStats(inventory.getFluidTag()));
+
+            MaterialVariantId stored = IMaterialItem.getMaterialFromStack(part);
+            if (!variant.equals(stored)) {
+                SilentTinkersMod.LOGGER.error(
+                        "[SilentTinkers:CAST_VARIANT_MISMATCH] requested={} stored={} composition={}",
+                        variant, stored, composition.fingerprint());
+            } else {
+                SilentTinkersMod.LOGGER.info(
+                        "[SilentTinkers:CAST_VARIANT_STORED] material={} composition={} statsPresent={}",
+                        stored, composition.fingerprint(), AlloyPayload.readStats(part).isPresent());
+            }
             return part;
         }).orElse(ItemStack.EMPTY);
     }
