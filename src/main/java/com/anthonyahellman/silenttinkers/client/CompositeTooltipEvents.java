@@ -44,7 +44,11 @@ public final class CompositeTooltipEvents {
 
     private static void appendCompositePartTooltip(ItemTooltipEvent event, ItemStack stack) {
         AlloyPayload.read(stack).ifPresent(composition -> {
-            event.getToolTip().add(Component.literal("SilentTinkers dynamic payload").withStyle(ChatFormatting.GOLD));
+            appendPlayerSummary(event, AlloyPayload.readVisualSource(stack),
+                    AlloyPayload.readStarChargeLevel(stack), composition.ingredients().size());
+            if (!event.getFlags().isAdvanced()) return;
+
+            event.getToolTip().add(Component.literal("SilentTinkers diagnostics").withStyle(ChatFormatting.DARK_GRAY));
             for (MaterialIngredient ingredient : composition.ingredients()) {
                 double percent = 100.0 * ingredient.units() / composition.totalUnits();
                 event.getToolTip().add(Component.literal(String.format("%s: %.1f%%", ingredient.materialId(), percent))
@@ -79,14 +83,23 @@ public final class CompositeTooltipEvents {
         }
         if (composite == null) return;
 
-        event.getToolTip().add(Component.literal("SilentTinkers assembled-tool diagnostic").withStyle(ChatFormatting.GOLD));
+        String variant = composite.getVariant().getVariant();
+        try {
+            appendPlayerSummary(event, AlloyVariantCodec.decodeVisualSource(variant),
+                    AlloyVariantCodec.decodeStarChargeLevel(variant),
+                    AlloyVariantCodec.decode(variant).ingredients().size());
+        } catch (IllegalArgumentException exception) {
+            event.getToolTip().add(Component.literal("SilentTinkers payload invalid").withStyle(ChatFormatting.RED));
+        }
+        if (!event.getFlags().isAdvanced()) return;
+
+        event.getToolTip().add(Component.literal("SilentTinkers diagnostics").withStyle(ChatFormatting.DARK_GRAY));
 
         boolean modifierPresent = tool.getModifiers().getModifiers().stream()
                 .anyMatch(entry -> entry.getId().toString().equals(SilentTinkersMod.MOD_ID + ":composite_alloy"));
         event.getToolTip().add(Component.literal("Composite modifier: " + (modifierPresent ? "BOUND" : "MISSING"))
                 .withStyle(modifierPresent ? ChatFormatting.GREEN : ChatFormatting.RED));
 
-        String variant = composite.getVariant().getVariant();
         Optional<AlloyStatSnapshot> encodedStats = Optional.empty();
         Optional<SourceVisualIdentity> visualSource = Optional.empty();
         int visualColor = SourceVisualColorResolver.FALLBACK_ARGB;
@@ -153,6 +166,17 @@ public final class CompositeTooltipEvents {
 
     private static String hexColor(int argb) {
         return String.format("#%06X", argb & 0xFFFFFF);
+    }
+
+    /** Compact information intended for normal play; F3+H reveals the full diagnostic block. */
+    private static void appendPlayerSummary(ItemTooltipEvent event, Optional<SourceVisualIdentity> visualSource,
+                                            int starChargeLevel, int ingredientCount) {
+        StringBuilder summary = new StringBuilder("Composite alloy");
+        if (ingredientCount > 1) summary.append(" • ").append(ingredientCount).append(" materials");
+        visualSource.flatMap(SourceVisualIdentity::silentGearGrade)
+                .ifPresent(grade -> summary.append(" • Grade ").append(grade));
+        if (starChargeLevel > 0) summary.append(" • Starcharged ").append(starChargeLevel);
+        event.getToolTip().add(Component.literal(summary.toString()).withStyle(ChatFormatting.LIGHT_PURPLE));
     }
 
     private static void appendDynamicStats(ItemTooltipEvent event, AlloyStatSnapshot stats) {
