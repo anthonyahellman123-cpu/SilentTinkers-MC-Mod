@@ -41,6 +41,7 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
     private static final Set<String> LOGGED_STAT_VARIANTS = ConcurrentHashMap.newKeySet();
     private static final Set<String> LOGGED_MISSING_STAT_VARIANTS = ConcurrentHashMap.newKeySet();
     private static final Set<String> LOGGED_CONTEXTS_WITHOUT_COMPOSITE = ConcurrentHashMap.newKeySet();
+    private static final Set<ResourceLocation> LOGGED_UNKNOWN_TIERS = ConcurrentHashMap.newKeySet();
 
     @Override
     protected void registerHooks(ModuleHookMap.Builder hookBuilder) {
@@ -164,8 +165,9 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
         Tier tier = TierSortingRegistry.byName(stats.harvestTier());
         if (tier != null) {
             ToolStats.HARVEST_TIER.update(builder, tier);
-        } else {
-            SilentTinkersMod.LOGGER.warn("[SilentTinkers:COMPOSITE_TIER_UNKNOWN] tier={}", stats.harvestTier());
+        } else if (LOGGED_UNKNOWN_TIERS.add(stats.harvestTier())) {
+            SilentTinkersMod.LOGGER.warn("[SilentTinkers:COMPOSITE_TIER_UNKNOWN] tier={} -- falling back to the tool's existing harvest tier",
+                    stats.harvestTier());
         }
     }
 }
