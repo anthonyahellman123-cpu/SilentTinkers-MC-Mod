@@ -1,5 +1,8 @@
 package com.anthonyahellman.silenttinkers.material;
 
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.TagParser;
 import net.minecraft.resources.ResourceLocation;
 
 import java.nio.charset.StandardCharsets;
@@ -63,6 +66,18 @@ public final class AlloyVariantCodec {
                     + encodeFloat(value.attackSpeed()) + '_'
                     + HexFormat.of().formatHex(value.harvestTier().toString().getBytes(StandardCharsets.UTF_8));
         }
+
+        // Tinkers only keeps the MaterialVariantId when a part becomes a tool.
+        // Preserve the source item's dynamic visual NBT in that variant when it
+        // fits our hard payload budget. Large tags degrade safely to item ID only.
+        if (visualSource.isPresent() && visualSource.get().itemTag().isPresent()) {
+            CompoundTag sourceTag = visualSource.get().itemTag().orElseThrow();
+            String nbtSuffix = ".n" + HexFormat.of().formatHex(
+                    sourceTag.toString().getBytes(StandardCharsets.UTF_8));
+            if (encoded.length() + nbtSuffix.length() <= MAX_ENCODED_LENGTH) {
+                encoded += nbtSuffix;
+            }
+        }
         return checked(encoded);
     }
 
@@ -112,6 +127,11 @@ public final class AlloyVariantCodec {
     }
 
     public static Optional<ResourceLocation> decodeVisualSourceItemId(String encoded) {
+        return decodeVisualSource(encoded).map(SourceVisualIdentity::itemId);
+    }
+
+    /** Restores as much of the original source stack identity as fit in the variant. */
+    public static Optional<SourceVisualIdentity> decodeVisualSource(String encoded) {
         validate(encoded);
         int marker = encoded.indexOf(".v", PREFIX.length());
         if (marker < 0) return Optional.empty();
@@ -121,9 +141,18 @@ public final class AlloyVariantCodec {
             ResourceLocation itemId = ResourceLocation.tryParse(new String(
                     HexFormat.of().parseHex(encodedItem), StandardCharsets.UTF_8));
             if (itemId == null) throw new IllegalArgumentException("Invalid visual source item ID");
-            return Optional.of(itemId);
-        } catch (IllegalArgumentException exception) {
-            throw new IllegalArgumentException("Malformed visual source item ID", exception);
+
+            Optional<CompoundTag> itemTag = Optional.empty();
+            int nbtMarker = encoded.indexOf(".n", PREFIX.length());
+            if (nbtMarker >= 0) {
+                int nbtEnd = nextMetadataMarker(encoded, nbtMarker + 2);
+                String encodedNbt = encoded.substring(nbtMarker + 2, nbtEnd < 0 ? encoded.length() : nbtEnd);
+                String snbt = new String(HexFormat.of().parseHex(encodedNbt), StandardCharsets.UTF_8);
+                itemTag = Optional.of(TagParser.parseTag(snbt));
+            }
+            return Optional.of(new SourceVisualIdentity(itemId, itemTag));
+        } catch (IllegalArgumentException | CommandSyntaxException exception) {
+            throw new IllegalArgumentException("Malformed visual source identity", exception);
         }
     }
 
@@ -158,7 +187,7 @@ public final class AlloyVariantCodec {
 
     private static int nextMetadataMarker(String encoded, int fromIndex) {
         int next = -1;
-        for (String marker : new String[]{".s", ".v", ".d"}) {
+        for (String marker : new String[]{".s", ".v", ".d", ".n"}) {
             int candidate = encoded.indexOf(marker, fromIndex);
             if (candidate >= 0 && (next < 0 || candidate < next)) next = candidate;
         }
