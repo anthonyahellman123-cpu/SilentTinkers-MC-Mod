@@ -1,12 +1,12 @@
 package com.anthonyahellman.silenttinkers.modifier;
 
 import com.anthonyahellman.silenttinkers.SilentTinkersMod;
-import com.anthonyahellman.silenttinkers.material.AlloyStatSnapshot;
-import com.anthonyahellman.silenttinkers.material.AlloyComposition;
-import com.anthonyahellman.silenttinkers.material.AlloyVariantCodec;
-import com.anthonyahellman.silenttinkers.material.MaterialIngredient;
 import com.anthonyahellman.silenttinkers.config.SilentTinkersConfig;
 import com.anthonyahellman.silenttinkers.config.TraitAccess;
+import com.anthonyahellman.silenttinkers.material.AlloyComposition;
+import com.anthonyahellman.silenttinkers.material.AlloyStatSnapshot;
+import com.anthonyahellman.silenttinkers.material.AlloyVariantCodec;
+import com.anthonyahellman.silenttinkers.material.MaterialIngredient;
 import com.anthonyahellman.silenttinkers.recipe.CompositePickHeadCastingRecipe;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Tier;
@@ -19,8 +19,8 @@ import slimeknights.tconstruct.library.materials.definition.MaterialVariant;
 import slimeknights.tconstruct.library.modifiers.Modifier;
 import slimeknights.tconstruct.library.modifiers.ModifierEntry;
 import slimeknights.tconstruct.library.modifiers.ModifierHooks;
-import slimeknights.tconstruct.library.modifiers.hook.build.ToolStatsModifierHook;
 import slimeknights.tconstruct.library.modifiers.hook.build.ModifierTraitHook;
+import slimeknights.tconstruct.library.modifiers.hook.build.ToolStatsModifierHook;
 import slimeknights.tconstruct.library.module.ModuleHookMap;
 import slimeknights.tconstruct.library.tools.nbt.IToolContext;
 import slimeknights.tconstruct.library.tools.stat.ModifierStatsBuilder;
@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /** Replaces the composite head's placeholder contribution with Silent Gear's evaluated stats. */
 public final class CompositeAlloyModifier extends Modifier implements ToolStatsModifierHook, ModifierTraitHook {
@@ -38,6 +39,8 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
     private static final float PLACEHOLDER_MINING_SPEED = 1.0f;
     private static final float PLACEHOLDER_MELEE_DAMAGE = 1.0f;
     private static final Set<String> LOGGED_STAT_VARIANTS = ConcurrentHashMap.newKeySet();
+    private static final Set<String> LOGGED_MISSING_STAT_VARIANTS = ConcurrentHashMap.newKeySet();
+    private static final Set<String> LOGGED_CONTEXTS_WITHOUT_COMPOSITE = ConcurrentHashMap.newKeySet();
 
     @Override
     protected void registerHooks(ModuleHookMap.Builder hookBuilder) {
@@ -117,10 +120,12 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
 
     @Override
     public void addToolStats(IToolContext context, ModifierEntry modifier, ModifierStatsBuilder builder) {
+        boolean foundComposite = false;
         for (MaterialVariant material : context.getMaterials()) {
             if (!material.getVariant().getId().equals(CompositePickHeadCastingRecipe.MATERIAL)) {
                 continue;
             }
+            foundComposite = true;
             Optional<AlloyStatSnapshot> decoded;
             try {
                 decoded = AlloyVariantCodec.decodeStats(material.getVariant().getVariant());
@@ -129,16 +134,35 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
                         material.getVariant(), exception);
                 continue;
             }
-            decoded.ifPresent(stats -> {
-                apply(stats, builder);
+            if (decoded.isEmpty()) {
                 String variantKey = material.getVariant().toString();
-                if (LOGGED_STAT_VARIANTS.add(variantKey)) {
-                    SilentTinkersMod.LOGGER.info(
-                            "[SilentTinkers:COMPOSITE_STATS_APPLIED] variant={} durability={} miningSpeed={} meleeDamage={} attackSpeed={} tier={}",
-                            material.getVariant(), stats.durability(), stats.miningSpeed(), stats.meleeDamage(),
-                            stats.attackSpeed(), stats.harvestTier());
+                if (LOGGED_MISSING_STAT_VARIANTS.add(variantKey)) {
+                    SilentTinkersMod.LOGGER.warn(
+                            "[SilentTinkers:COMPOSITE_STATS_MISSING] variant={} -- composite material reached tool construction without encoded stats",
+                            material.getVariant());
                 }
-            });
+                continue;
+            }
+            AlloyStatSnapshot stats = decoded.orElseThrow();
+            apply(stats, builder);
+            String variantKey = material.getVariant().toString();
+            if (LOGGED_STAT_VARIANTS.add(variantKey)) {
+                SilentTinkersMod.LOGGER.info(
+                        "[SilentTinkers:COMPOSITE_STATS_APPLIED] variant={} durability={} miningSpeed={} meleeDamage={} attackSpeed={} tier={}",
+                        material.getVariant(), stats.durability(), stats.miningSpeed(), stats.meleeDamage(),
+                        stats.attackSpeed(), stats.harvestTier());
+            }
+        }
+
+        if (!foundComposite) {
+            String materials = context.getMaterials().stream()
+                    .map(material -> material.getVariant().toString())
+                    .collect(Collectors.joining(","));
+            if (LOGGED_CONTEXTS_WITHOUT_COMPOSITE.add(materials)) {
+                SilentTinkersMod.LOGGER.warn(
+                        "[SilentTinkers:COMPOSITE_MODIFIER_WITHOUT_MATERIAL] materials=[{}] -- modifier ran but composite material variant is absent",
+                        materials);
+            }
         }
     }
 
@@ -151,6 +175,8 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
         Tier tier = TierSortingRegistry.byName(stats.harvestTier());
         if (tier != null) {
             ToolStats.HARVEST_TIER.update(builder, tier);
+        } else {
+            SilentTinkersMod.LOGGER.warn("[SilentTinkers:COMPOSITE_TIER_UNKNOWN] tier={}", stats.harvestTier());
         }
     }
 }
