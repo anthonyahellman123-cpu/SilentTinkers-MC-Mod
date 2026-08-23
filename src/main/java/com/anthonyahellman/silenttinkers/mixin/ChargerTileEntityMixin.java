@@ -15,9 +15,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /** Narrow extensions to Silent Gear's existing starlight charger lifecycle. */
-@Mixin(ChargerTileEntity.class)
+@Mixin(value = ChargerTileEntity.class, remap = false)
 public abstract class ChargerTileEntityMixin {
-    @Inject(method = "canPlaceItem", at = @At("HEAD"), cancellable = true)
+    @Inject(method = {"canPlaceItem", "m_7013_"}, at = @At("HEAD"), cancellable = true)
     private void silenttinkers$allowCompositeInput(int slot, ItemStack stack,
                                                     CallbackInfoReturnable<Boolean> callback) {
         if (slot == 0 && CompositeStarChargeService.canBeginCharging(stack)) callback.setReturnValue(true);
