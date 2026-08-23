@@ -6,6 +6,7 @@ import com.anthonyahellman.silenttinkers.material.AlloyStatSnapshot;
 import com.anthonyahellman.silenttinkers.material.MaterialDiscoveryState;
 import com.anthonyahellman.silenttinkers.material.MaterialIngredient;
 import com.anthonyahellman.silenttinkers.material.UnifiedMaterialDiscovery;
+import com.anthonyahellman.silenttinkers.recipe.CompositePickHeadCastingRecipe;
 import com.anthonyahellman.silenttinkers.registry.ModFluids;
 import com.anthonyahellman.silenttinkers.registry.ModItems;
 import com.anthonyahellman.silenttinkers.registry.ModModifiers;
@@ -24,7 +25,12 @@ import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.slf4j.Logger;
+import slimeknights.tconstruct.library.materials.MaterialRegistry;
+import slimeknights.tconstruct.library.modifiers.ModifierEntry;
 import slimeknights.tconstruct.tools.TinkerToolParts;
+import slimeknights.tconstruct.tools.stats.HeadMaterialStats;
+
+import java.util.List;
 
 @Mod(SilentTinkersMod.MOD_ID)
 public final class SilentTinkersMod {
@@ -54,12 +60,32 @@ public final class SilentTinkersMod {
         LOGGER.info("SilentTinkers material scan starting after datapack sync");
         try {
             UnifiedMaterialDiscovery.discover();
+            validateCompositeTraitBinding();
         } catch (RuntimeException | LinkageError exception) {
             // A bad addon/material must never make player login or a dedicated
             // server datapack sync fail. Drop the snapshot so the bridge cannot
             // act on stale or partial data; later syncs may safely retry.
             MaterialDiscoveryState.clear();
             LOGGER.error("[SilentTinkers:SCAN_FAILED] Material discovery failed; automatic bridging disabled until a later successful scan", exception);
+        }
+    }
+
+    /**
+     * Confirms the static composite material actually grants our modifier for
+     * head-stat tools. Dynamic variants inherit traits from the base material ID,
+     * so this is the earliest useful checkpoint for the final tool handoff.
+     */
+    private static void validateCompositeTraitBinding() {
+        List<ModifierEntry> traits = MaterialRegistry.getInstance()
+                .getTraits(CompositePickHeadCastingRecipe.MATERIAL, HeadMaterialStats.ID);
+        String expected = MOD_ID + ":composite_alloy";
+        boolean bound = traits.stream().anyMatch(entry -> entry.getId().toString().equals(expected));
+        if (bound) {
+            LOGGER.info("[SilentTinkers:COMPOSITE_TRAIT_BOUND] material={} statType={} traits={}",
+                    CompositePickHeadCastingRecipe.MATERIAL, HeadMaterialStats.ID, traits);
+        } else {
+            LOGGER.error("[SilentTinkers:COMPOSITE_TRAIT_MISSING] material={} statType={} traits={} -- assembled tools cannot receive dynamic stats until this trait is present",
+                    CompositePickHeadCastingRecipe.MATERIAL, HeadMaterialStats.ID, traits);
         }
     }
 
