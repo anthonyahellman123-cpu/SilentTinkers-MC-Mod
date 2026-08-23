@@ -7,6 +7,7 @@ import com.anthonyahellman.silenttinkers.material.AlloyComposition;
 import com.anthonyahellman.silenttinkers.material.AlloyStatSnapshot;
 import com.anthonyahellman.silenttinkers.material.AlloyVariantCodec;
 import com.anthonyahellman.silenttinkers.material.MaterialIngredient;
+import com.anthonyahellman.silenttinkers.material.RuntimeBridgeHealth;
 import com.anthonyahellman.silenttinkers.recipe.CompositePickHeadCastingRecipe;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Tier;
@@ -97,6 +98,11 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
             return Optional.of(tconstruct);
         }
 
+        MaterialId tconstruct = new MaterialId("tconstruct", sourceId.getPath());
+        if (registry.getMaterial(tconstruct) != IMaterial.UNKNOWN) {
+            return Optional.of(tconstruct);
+        }
+
         List<MaterialId> samePath = registry.getAllMaterials().stream()
                 .map(IMaterial::getIdentifier)
                 .filter(id -> id.getPath().equals(sourceId.getPath()))
@@ -135,6 +141,7 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
             }
             AlloyStatSnapshot stats = decoded.orElseThrow();
             apply(stats, builder);
+            RuntimeBridgeHealth.markCompositeStatsApplied();
             String variantKey = material.getVariant().toString();
             if (LOGGED_STAT_VARIANTS.add(variantKey)) {
                 SilentTinkersMod.LOGGER.info(
