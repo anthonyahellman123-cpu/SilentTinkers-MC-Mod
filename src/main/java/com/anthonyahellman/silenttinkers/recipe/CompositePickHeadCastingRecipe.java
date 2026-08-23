@@ -62,14 +62,9 @@ public final class CompositePickHeadCastingRecipe extends AbstractCastingRecipe 
             int starChargeLevel = AlloyPayload.readStarChargeLevel(inventory.getFluidTag());
             Optional<AlloyStatSnapshot> sourceStats = AlloyPayload.readStats(inventory.getFluidTag());
             Optional<SourceVisualIdentity> visualSource = AlloyPayload.readVisualSource(inventory.getFluidTag());
-            String encoded = AlloyVariantCodec.encode(composition, starChargeLevel, sourceStats);
+            String encoded = AlloyVariantCodec.encode(composition, starChargeLevel, sourceStats, visualSource);
             MaterialVariantId variant = MaterialVariantId.create(MATERIAL, encoded);
 
-            // This is a deliberately synthetic MaterialVariantId. Tinkers' normal
-            // withMaterial() path validates a part's material before writing it.
-            // The base composite material is valid, but forcing the known-safe
-            // variant here removes validation as a place where our payload could
-            // be silently collapsed back to the plain composite material.
             ItemStack part = TinkerToolParts.pickHead.get().withMaterialForDisplay(variant);
             AlloyPayload.write(part, composition, starChargeLevel, sourceStats, visualSource);
 
@@ -81,24 +76,23 @@ public final class CompositePickHeadCastingRecipe extends AbstractCastingRecipe 
                 return part;
             }
 
-            // Verify the exact serialized material string, not just the extra
-            // SilentTinkers payload tag. The assembled Tinkers tool only receives
-            // the MaterialVariantId, so this is the boundary that must preserve
-            // composition/stats for the later modifier hook to recover them.
             try {
                 boolean compositionMatches = composition.fingerprint().equals(
                         AlloyVariantCodec.decode(stored.getVariant()).fingerprint());
                 Optional<AlloyStatSnapshot> storedVariantStats = AlloyVariantCodec.decodeStats(stored.getVariant());
+                Optional<ResourceLocation> storedVisualSource = AlloyVariantCodec.decodeVisualSourceItemId(stored.getVariant());
                 boolean statsMatch = sourceStats.equals(storedVariantStats);
-                if (!compositionMatches || !statsMatch) {
+                boolean visualSourceMatches = visualSource.map(SourceVisualIdentity::itemId).equals(storedVisualSource);
+                if (!compositionMatches || !statsMatch || !visualSourceMatches) {
                     SilentTinkersMod.LOGGER.error(
-                            "[SilentTinkers:CAST_VARIANT_PAYLOAD_MISMATCH] material={} compositionMatches={} statsMatch={} sourceStatsPresent={} storedVariantStatsPresent={}",
-                            stored, compositionMatches, statsMatch, sourceStats.isPresent(), storedVariantStats.isPresent());
+                            "[SilentTinkers:CAST_VARIANT_PAYLOAD_MISMATCH] material={} compositionMatches={} statsMatch={} visualSourceMatches={} sourceStatsPresent={} storedVariantStatsPresent={}",
+                            stored, compositionMatches, statsMatch, visualSourceMatches,
+                            sourceStats.isPresent(), storedVariantStats.isPresent());
                 } else {
                     SilentTinkersMod.LOGGER.info(
                             "[SilentTinkers:CAST_VARIANT_STORED] material={} composition={} statsPresent={} visualSource={} variantPayloadVerified=true",
                             stored, composition.fingerprint(), sourceStats.isPresent(),
-                            visualSource.map(value -> value.itemId().toString()).orElse("NONE"));
+                            storedVisualSource.map(Object::toString).orElse("NONE"));
                 }
             } catch (IllegalArgumentException exception) {
                 SilentTinkersMod.LOGGER.error(
