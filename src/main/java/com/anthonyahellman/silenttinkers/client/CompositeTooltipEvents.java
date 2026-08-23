@@ -54,7 +54,10 @@ public final class CompositeTooltipEvents {
                 event.getToolTip().add(Component.literal("Visual source: " + visual.itemId()
                                 + (visual.itemTag().isPresent() ? " (dynamic tag preserved)" : ""))
                         .withStyle(ChatFormatting.AQUA));
-                event.getToolTip().add(Component.literal("Visual sample: " + hexColor(SourceVisualColorResolver.resolve(visual)))
+                visual.silentGearGrade().ifPresent(grade -> event.getToolTip().add(
+                        Component.literal("Silent Gear grade: " + grade).withStyle(ChatFormatting.LIGHT_PURPLE)));
+                int mixedColor = AlloyVisualColorResolver.resolve(composition, Optional.of(visual));
+                event.getToolTip().add(Component.literal("Mixed alloy color: " + hexColor(mixedColor))
                         .withStyle(ChatFormatting.DARK_AQUA));
             });
             AlloyPayload.readStats(stack).ifPresent(stats -> appendDynamicStats(event, stats));
@@ -101,8 +104,11 @@ public final class CompositeTooltipEvents {
                                     .map(source -> " (dynamic tag encoded)").orElse(""))
                     .withStyle(observedVisualSource.isPresent() ? ChatFormatting.AQUA : ChatFormatting.DARK_GRAY));
             if (visualSource.isPresent()) {
-                visualColor = SourceVisualColorResolver.resolve(visualSource.orElseThrow());
-                event.getToolTip().add(Component.literal("Visual sample: " + hexColor(visualColor))
+                visualSource.orElseThrow().silentGearGrade().ifPresent(grade -> event.getToolTip().add(
+                        Component.literal("Silent Gear grade: " + grade).withStyle(ChatFormatting.LIGHT_PURPLE)));
+                visualColor = AlloyVisualColorResolver.resolve(
+                        AlloyVariantCodec.decode(variant), visualSource);
+                event.getToolTip().add(Component.literal("Mixed alloy color: " + hexColor(visualColor))
                         .withStyle(ChatFormatting.DARK_AQUA));
             }
             if (encodedStats.isPresent()) {

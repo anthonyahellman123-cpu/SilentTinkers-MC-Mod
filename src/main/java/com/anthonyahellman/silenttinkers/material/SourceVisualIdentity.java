@@ -26,6 +26,7 @@ import java.util.Optional;
 public record SourceVisualIdentity(ResourceLocation itemId, Optional<CompoundTag> itemTag) {
     private static final String ITEM_KEY = "Item";
     private static final String TAG_KEY = "Tag";
+    private static final String SILENT_GEAR_GRADE_KEY = "SGear_Grade";
     private static final int MAX_TAG_TEXT_LENGTH = 32_768;
 
     public SourceVisualIdentity {
@@ -59,6 +60,13 @@ public record SourceVisualIdentity(ResourceLocation itemId, Optional<CompoundTag
         tag.putString(ITEM_KEY, itemId.toString());
         itemTag.ifPresent(value -> tag.put(TAG_KEY, value.copy()));
         return tag;
+    }
+
+    /** Returns the native Silent Gear grade carried by the source stack. */
+    public Optional<String> silentGearGrade() {
+        return itemTag.filter(tag -> tag.contains(SILENT_GEAR_GRADE_KEY, Tag.TAG_STRING))
+                .map(tag -> tag.getString(SILENT_GEAR_GRADE_KEY))
+                .filter(value -> !value.isBlank() && !"NONE".equalsIgnoreCase(value));
     }
 
     public static Optional<SourceVisualIdentity> load(CompoundTag tag) {

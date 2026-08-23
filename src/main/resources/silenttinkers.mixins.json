@@ -7,6 +7,9 @@
     "ChargerInputSlotMixin",
     "ChargerTileEntityMixin"
   ],
+  "client": [
+    "CompositeMaterialRenderMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }

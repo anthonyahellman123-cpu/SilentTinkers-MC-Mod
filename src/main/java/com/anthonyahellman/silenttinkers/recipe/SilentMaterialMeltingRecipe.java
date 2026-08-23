@@ -1,6 +1,7 @@
 package com.anthonyahellman.silenttinkers.recipe;
 
 import com.anthonyahellman.silenttinkers.compat.silentgear.SilentGearAlloyReader;
+import com.anthonyahellman.silenttinkers.compat.silentgear.SilentGearStatReader;
 import com.anthonyahellman.silenttinkers.material.AlloyPayload;
 import com.anthonyahellman.silenttinkers.material.DynamicTinkersBridgePayload;
 import com.anthonyahellman.silenttinkers.material.MaterialDiscoveryState;
@@ -55,7 +56,8 @@ public final class SilentMaterialMeltingRecipe implements IMeltingRecipe {
         if (payload.isEmpty()) return FluidStack.EMPTY;
 
         FluidStack output = new FluidStack(ModFluids.MOLTEN_COMPOSITE_ALLOY.get(), FluidValues.INGOT);
-        AlloyPayload.write(output, payload.get().composition(), 0, Optional.of(payload.get().stats()),
+        AlloyPayload.write(output, payload.get().composition(), 0,
+                SilentGearStatReader.read(sourceStack).or(() -> Optional.of(payload.get().stats())),
                 SourceVisualIdentity.capture(sourceStack));
         return output;
     }
