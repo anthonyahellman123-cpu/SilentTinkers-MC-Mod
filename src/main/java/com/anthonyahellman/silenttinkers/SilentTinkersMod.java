@@ -4,6 +4,7 @@ import com.anthonyahellman.silenttinkers.command.SilentTinkersCommands;
 import com.anthonyahellman.silenttinkers.config.SilentTinkersConfig;
 import com.anthonyahellman.silenttinkers.material.CompositeBridgeHealth;
 import com.anthonyahellman.silenttinkers.material.MaterialDiscoveryState;
+import com.anthonyahellman.silenttinkers.material.RuntimeBridgeHealth;
 import com.anthonyahellman.silenttinkers.material.UnifiedMaterialDiscovery;
 import com.anthonyahellman.silenttinkers.modifier.CompositeAlloyModifier;
 import com.anthonyahellman.silenttinkers.recipe.CompositePickHeadCastingRecipe;
@@ -51,9 +52,7 @@ public final class SilentTinkersMod {
     }
 
     private void onDatapackSync(OnDatapackSyncEvent event) {
-        if (event.getPlayer() != null && MaterialDiscoveryState.current().isPresent()) {
-            return;
-        }
+        if (event.getPlayer() != null && MaterialDiscoveryState.current().isPresent()) return;
 
         LOGGER.info("SilentTinkers material scan starting after datapack sync");
         try {
@@ -62,6 +61,7 @@ public final class SilentTinkersMod {
         } catch (RuntimeException | LinkageError exception) {
             MaterialDiscoveryState.clear();
             CompositeBridgeHealth.clear();
+            RuntimeBridgeHealth.clear();
             LOGGER.error("[SilentTinkers:SCAN_FAILED] Material discovery failed; automatic bridging disabled until a later successful scan", exception);
         }
     }
@@ -105,5 +105,6 @@ public final class SilentTinkersMod {
     private void onServerStopped(ServerStoppedEvent event) {
         MaterialDiscoveryState.clear();
         CompositeBridgeHealth.clear();
+        RuntimeBridgeHealth.clear();
     }
 }
