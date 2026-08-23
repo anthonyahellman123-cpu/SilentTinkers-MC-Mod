@@ -36,6 +36,16 @@ final class MaterialPlanFingerprintTest {
                 MaterialPlanFingerprint.ofEvaluations(List.of(quarantined)));
     }
 
+    @Test
+    void fingerprintChangesWhenResolvedStatsChange() {
+        MaterialGenerationEvaluation first = readyEvaluation(720.0f);
+        MaterialGenerationEvaluation second = readyEvaluation(900.0f);
+
+        assertNotEquals(
+                MaterialPlanFingerprint.ofEvaluations(List.of(first)),
+                MaterialPlanFingerprint.ofEvaluations(List.of(second)));
+    }
+
     private static MaterialGenerationEvaluation evaluation(String namespace,
                                                            String path,
                                                            MaterialGenerationEvaluation.Status status) {
@@ -45,5 +55,21 @@ final class MaterialPlanFingerprintTest {
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
         return new MaterialGenerationEvaluation(
                 request, status, Optional.empty(), Optional.empty(), "test");
+    }
+
+    private static MaterialGenerationEvaluation readyEvaluation(float durability) {
+        ResourceLocation sourceMaterial = new ResourceLocation("silentcompat", "elementium");
+        MaterialGenerationRequest request = new MaterialGenerationRequest(
+                new ResourceLocation("botania", "elementium_ingot"),
+                MaterialBridgePlan.Action.BRIDGE,
+                Optional.of(MaterialProfile.Ecosystem.SILENT_GEAR),
+                Optional.of(MaterialProfile.Ecosystem.TINKERS_CONSTRUCT),
+                Optional.of(sourceMaterial),
+                Optional.empty());
+        TranslatedMaterialStats stats = new TranslatedMaterialStats(
+                durability, 6.2f, 2.0f, 0.0f, new ResourceLocation("minecraft", "diamond"));
+        return new MaterialGenerationEvaluation(
+                request, MaterialGenerationEvaluation.Status.READY_FOR_TINKERS,
+                Optional.of(stats), Optional.empty(), "test");
     }
 }
