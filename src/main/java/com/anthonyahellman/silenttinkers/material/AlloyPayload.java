@@ -16,6 +16,7 @@ public final class AlloyPayload {
     public static final String ROOT_KEY = "SilentTinkersAlloy";
     private static final String STAR_CHARGE_KEY = "StarChargeLevel";
     private static final String STATS_KEY = "EvaluatedStats";
+    private static final String VISUAL_SOURCE_KEY = "VisualSource";
 
     private AlloyPayload() {}
 
@@ -37,13 +38,25 @@ public final class AlloyPayload {
 
     public static void write(ItemStack stack, AlloyComposition composition, int starChargeLevel,
                              Optional<AlloyStatSnapshot> stats) {
-        stack.getOrCreateTag().put(ROOT_KEY, createRoot(composition, starChargeLevel, stats));
+        write(stack, composition, starChargeLevel, stats, Optional.empty());
     }
 
     public static void write(FluidStack stack, AlloyComposition composition, int starChargeLevel,
                              Optional<AlloyStatSnapshot> stats) {
+        write(stack, composition, starChargeLevel, stats, Optional.empty());
+    }
+
+    public static void write(ItemStack stack, AlloyComposition composition, int starChargeLevel,
+                             Optional<AlloyStatSnapshot> stats,
+                             Optional<SourceVisualIdentity> visualSource) {
+        stack.getOrCreateTag().put(ROOT_KEY, createRoot(composition, starChargeLevel, stats, visualSource));
+    }
+
+    public static void write(FluidStack stack, AlloyComposition composition, int starChargeLevel,
+                             Optional<AlloyStatSnapshot> stats,
+                             Optional<SourceVisualIdentity> visualSource) {
         CompoundTag tag = stack.getOrCreateTag();
-        tag.put(ROOT_KEY, createRoot(composition, starChargeLevel, stats));
+        tag.put(ROOT_KEY, createRoot(composition, starChargeLevel, stats, visualSource));
     }
 
     public static Optional<AlloyComposition> read(ItemStack stack) {
@@ -101,13 +114,33 @@ public final class AlloyPayload {
                 : Optional.empty();
     }
 
+    public static Optional<SourceVisualIdentity> readVisualSource(ItemStack stack) {
+        return readVisualSource(stack.getTag());
+    }
+
+    public static Optional<SourceVisualIdentity> readVisualSource(FluidStack stack) {
+        return readVisualSource(stack.getTag());
+    }
+
+    public static Optional<SourceVisualIdentity> readVisualSource(CompoundTag carrierTag) {
+        if (carrierTag == null || !carrierTag.contains(ROOT_KEY, Tag.TAG_COMPOUND)) {
+            return Optional.empty();
+        }
+        CompoundTag root = carrierTag.getCompound(ROOT_KEY);
+        return root.contains(VISUAL_SOURCE_KEY, Tag.TAG_COMPOUND)
+                ? SourceVisualIdentity.load(root.getCompound(VISUAL_SOURCE_KEY))
+                : Optional.empty();
+    }
+
     private static CompoundTag createRoot(AlloyComposition composition, int starChargeLevel,
-                                          Optional<AlloyStatSnapshot> stats) {
+                                          Optional<AlloyStatSnapshot> stats,
+                                          Optional<SourceVisualIdentity> visualSource) {
         CompoundTag root = composition.save();
         if (starChargeLevel > 0) {
             root.putInt(STAR_CHARGE_KEY, starChargeLevel);
         }
         stats.ifPresent(value -> root.put(STATS_KEY, value.save()));
+        visualSource.ifPresent(value -> root.put(VISUAL_SOURCE_KEY, value.save()));
         return root;
     }
 }
