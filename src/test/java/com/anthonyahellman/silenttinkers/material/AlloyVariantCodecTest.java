@@ -98,4 +98,27 @@ final class AlloyVariantCodecTest {
         assertEquals(4, AlloyVariantCodec.decodeStarChargeLevel(encoded));
         assertEquals(stats, AlloyVariantCodec.decodeStats(encoded).orElseThrow());
     }
+
+    @Test
+    void sourceItemIdentitySurvivesFinishedToolMaterialPersistence() {
+        AlloyComposition composition = AlloyComposition.of(Map.of(
+                new ResourceLocation("silentcompat", "elementium"), 1L));
+        AlloyStatSnapshot stats = new AlloyStatSnapshot(
+                720.0f, 6.2f, 2.0f, 0.0f,
+                new ResourceLocation("minecraft", "diamond"));
+        SourceVisualIdentity visualSource = new SourceVisualIdentity(
+                new ResourceLocation("botania", "elementium_ingot"), Optional.empty());
+
+        MaterialVariantId variant = MaterialVariantId.create(
+                new MaterialId("silenttinkers", "composite_alloy"),
+                AlloyVariantCodec.encode(composition, 0, Optional.of(stats), Optional.of(visualSource)));
+        MaterialNBT restored = MaterialNBT.readFromNBT(
+                MaterialNBT.of(MaterialVariant.of(variant)).serializeToNBT());
+        String restoredVariant = restored.get(0).getVariant().getVariant();
+
+        assertEquals(new ResourceLocation("botania", "elementium_ingot"),
+                AlloyVariantCodec.decodeVisualSourceItemId(restoredVariant).orElseThrow());
+        assertEquals(stats, AlloyVariantCodec.decodeStats(restoredVariant).orElseThrow());
+        assertEquals(composition.fingerprint(), AlloyVariantCodec.decode(restoredVariant).fingerprint());
+    }
 }
