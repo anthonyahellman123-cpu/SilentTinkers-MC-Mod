@@ -56,6 +56,10 @@ public final class CompositeTooltipEvents {
                 event.getToolTip().add(Component.literal(String.format("%s: %.1f%%", ingredient.materialId(), percent))
                         .withStyle(ChatFormatting.GRAY));
             }
+            AlloyPayload.readVisualSource(stack).ifPresent(visual -> event.getToolTip().add(
+                    Component.literal("Visual source: " + visual.itemId()
+                                    + (visual.itemTag().isPresent() ? " (dynamic tag preserved)" : ""))
+                            .withStyle(ChatFormatting.AQUA)));
             AlloyPayload.readStats(stack).ifPresent(stats -> appendDynamicStats(event, stats));
         });
     }
