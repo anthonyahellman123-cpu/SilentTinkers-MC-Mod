@@ -21,6 +21,7 @@ class DynamicBridgeItemPolicyTest {
         assertFalse(DynamicBridgeItemPolicy.isOneUnitMaterial(id("example:bronze_nugget")));
         assertFalse(DynamicBridgeItemPolicy.isOneUnitMaterial(id("minecraft:oak_planks")));
         assertFalse(DynamicBridgeItemPolicy.isOneUnitMaterial(id("example:bronze_plate")));
+        assertFalse(DynamicBridgeItemPolicy.isOneUnitMaterial(id("botania:elementium_ore")));
     }
 
     private static ResourceLocation id(String value) {
