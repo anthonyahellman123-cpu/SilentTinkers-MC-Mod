@@ -53,12 +53,16 @@ public final class UnifiedMaterialDiscovery {
         int tinkersSourceReady = 0;
         int bootstrapPending = 0;
         int requestQuarantined = 0;
+        int preserved = 0;
         List<MaterialGenerationEvaluation> evaluations = new ArrayList<>(requests.size());
 
         for (MaterialGenerationRequest request : requests) {
             MaterialGenerationEvaluation evaluation = MaterialGenerationEvaluator.evaluate(request);
             evaluations.add(evaluation);
-            if (evaluation.status() == MaterialGenerationEvaluation.Status.PRESERVED) continue;
+            if (evaluation.status() == MaterialGenerationEvaluation.Status.PRESERVED) {
+                preserved++;
+                continue;
+            }
 
             SilentTinkersMod.LOGGER.info(
                     "[SilentTinkers:EVALUATE] item={} action={} source={} sourceMaterial={} target={} status={} detail={}",
@@ -106,7 +110,27 @@ public final class UnifiedMaterialDiscovery {
         SilentTinkersMod.LOGGER.info(
                 "[SilentTinkers:RUNTIME_INDEX] dynamicTinkersMaterials={} deferredPhysicalForm={} -- eligible materials use tagged-fluid casting",
                 runtimeReady, deferredPhysicalForm);
+        logStartupSummary(silentGear, tinkers, preserved, readyForTinkers, runtimeReady,
+                deferredPhysicalForm, tinkersSourceReady, bootstrapPending,
+                requestQuarantined, ambiguous.size());
         return completedSnapshot;
+    }
+
+    private static void logStartupSummary(SilentGearDiscoveryBridge.DiscoveryReport silentGear,
+                                          TinkersCorrelationAdapter.DiscoveryReport tinkers,
+                                          int preserved,
+                                          int readyForTinkers,
+                                          int runtimeReady,
+                                          long deferredPhysicalForm,
+                                          int tinkersSourceReady,
+                                          int bootstrapPending,
+                                          int requestQuarantined,
+                                          int aliasQuarantined) {
+        int quarantined = requestQuarantined + aliasQuarantined;
+        SilentTinkersMod.LOGGER.info(
+                "[SilentTinkers:STARTUP_SUMMARY] SG={} TCon={} preserved={} bridgeToTinkers={} runtimeReady={} deferredPhysicalForm={} tinkersSourceReady={} bootstrapPending={} quarantined={} status=READY",
+                silentGear.materials(), tinkers.materials(), preserved, readyForTinkers, runtimeReady,
+                deferredPhysicalForm, tinkersSourceReady, bootstrapPending, quarantined);
     }
 
     public record Snapshot(MaterialCorrelationIndex index,
