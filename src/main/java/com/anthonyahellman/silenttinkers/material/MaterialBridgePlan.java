@@ -7,14 +7,16 @@ import java.util.Optional;
 
 /**
  * Read-only decision produced before SilentTinkers mutates or generates any
- * compatibility data. Keeping planning separate makes generation auditable and
- * gives the future planner UI the same answer as the automatic bridge engine.
+ * compatibility data. Material IDs are carried here so downstream generation
+ * never has to reverse-resolve identity from a representative physical alias.
  */
 public record MaterialBridgePlan(
         ResourceLocation physicalItem,
         Action action,
         Optional<MaterialProfile.Ecosystem> source,
         Optional<MaterialProfile.Ecosystem> target,
+        Optional<ResourceLocation> sourceMaterialId,
+        Optional<ResourceLocation> targetMaterialId,
         Reason reason) {
 
     public MaterialBridgePlan {
@@ -22,15 +24,17 @@ public record MaterialBridgePlan(
         Objects.requireNonNull(action, "action");
         source = Objects.requireNonNull(source, "source");
         target = Objects.requireNonNull(target, "target");
+        sourceMaterialId = Objects.requireNonNull(sourceMaterialId, "sourceMaterialId");
+        targetMaterialId = Objects.requireNonNull(targetMaterialId, "targetMaterialId");
         Objects.requireNonNull(reason, "reason");
+        if (source.isPresent() != sourceMaterialId.isPresent()) {
+            throw new IllegalArgumentException("source ecosystem and source material id must be present together");
+        }
     }
 
     public enum Action {
-        /** Both equipment ecosystems already understand this physical material. */
         PRESERVE,
-        /** Exactly one ecosystem understands it; generate only the missing side. */
         BRIDGE,
-        /** Neither ecosystem understands it; external discovery must seed both. */
         BOOTSTRAP
     }
 
