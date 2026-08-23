@@ -1,9 +1,12 @@
 package com.anthonyahellman.silenttinkers.material;
 
+import net.minecraft.nbt.ListTag;
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Test;
 import slimeknights.tconstruct.library.materials.definition.MaterialId;
+import slimeknights.tconstruct.library.materials.definition.MaterialVariant;
 import slimeknights.tconstruct.library.materials.definition.MaterialVariantId;
+import slimeknights.tconstruct.library.tools.nbt.MaterialNBT;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -54,6 +57,29 @@ final class AlloyVariantCodecTest {
         assertTrue(created.sameVariant(reparsed));
         assertEquals(composition.fingerprint(), AlloyVariantCodec.decode(reparsed.getVariant()).fingerprint());
         assertEquals(stats, AlloyVariantCodec.decodeStats(reparsed.getVariant()).orElseThrow());
+    }
+
+    @Test
+    void encodedPayloadSurvivesTinkersMaterialNbtPersistence() {
+        ResourceLocation elementium = new ResourceLocation("silentcompat", "elementium");
+        Map<ResourceLocation, Long> ingredients = new LinkedHashMap<>();
+        ingredients.put(elementium, 1L);
+        AlloyComposition composition = AlloyComposition.of(ingredients);
+        AlloyStatSnapshot stats = new AlloyStatSnapshot(
+                720.0f, 6.2f, 2.0f, 0.0f,
+                new ResourceLocation("minecraft", "diamond"));
+
+        MaterialVariantId variant = MaterialVariantId.create(
+                new MaterialId("silenttinkers", "composite_alloy"),
+                AlloyVariantCodec.encode(composition, 0, Optional.of(stats)));
+        MaterialNBT original = MaterialNBT.of(MaterialVariant.of(variant));
+        ListTag serialized = original.serializeToNBT();
+        MaterialNBT restored = MaterialNBT.readFromNBT(serialized);
+        MaterialVariantId restoredVariant = restored.get(0).getVariant();
+
+        assertTrue(variant.sameVariant(restoredVariant));
+        assertEquals(composition.fingerprint(), AlloyVariantCodec.decode(restoredVariant.getVariant()).fingerprint());
+        assertEquals(stats, AlloyVariantCodec.decodeStats(restoredVariant.getVariant()).orElseThrow());
     }
 
     @Test
