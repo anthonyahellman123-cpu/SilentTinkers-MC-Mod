@@ -1,5 +1,6 @@
 package com.anthonyahellman.silenttinkers.modifier;
 
+import com.anthonyahellman.silenttinkers.SilentTinkersMod;
 import com.anthonyahellman.silenttinkers.material.AlloyStatSnapshot;
 import com.anthonyahellman.silenttinkers.material.AlloyComposition;
 import com.anthonyahellman.silenttinkers.material.AlloyVariantCodec;
@@ -28,12 +29,15 @@ import slimeknights.tconstruct.tools.stats.HeadMaterialStats;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /** Replaces the composite head's placeholder contribution with Silent Gear's evaluated stats. */
 public final class CompositeAlloyModifier extends Modifier implements ToolStatsModifierHook, ModifierTraitHook {
     private static final float PLACEHOLDER_DURABILITY = 1.0f;
     private static final float PLACEHOLDER_MINING_SPEED = 1.0f;
     private static final float PLACEHOLDER_MELEE_DAMAGE = 1.0f;
+    private static final Set<String> LOGGED_STAT_VARIANTS = ConcurrentHashMap.newKeySet();
 
     @Override
     protected void registerHooks(ModuleHookMap.Builder hookBuilder) {
@@ -121,9 +125,20 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
             try {
                 decoded = AlloyVariantCodec.decodeStats(material.getVariant().getVariant());
             } catch (IllegalArgumentException exception) {
+                SilentTinkersMod.LOGGER.warn("[SilentTinkers:COMPOSITE_STATS_DECODE_FAILED] variant={}",
+                        material.getVariant(), exception);
                 continue;
             }
-            decoded.ifPresent(stats -> apply(stats, builder));
+            decoded.ifPresent(stats -> {
+                apply(stats, builder);
+                String variantKey = material.getVariant().toString();
+                if (LOGGED_STAT_VARIANTS.add(variantKey)) {
+                    SilentTinkersMod.LOGGER.info(
+                            "[SilentTinkers:COMPOSITE_STATS_APPLIED] variant={} durability={} miningSpeed={} meleeDamage={} attackSpeed={} tier={}",
+                            material.getVariant(), stats.durability(), stats.miningSpeed(), stats.meleeDamage(),
+                            stats.attackSpeed(), stats.harvestTier());
+                }
+            });
         }
     }
 
