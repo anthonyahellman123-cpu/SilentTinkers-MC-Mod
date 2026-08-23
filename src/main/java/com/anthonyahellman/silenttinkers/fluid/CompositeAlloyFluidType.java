@@ -26,7 +26,7 @@ public final class CompositeAlloyFluidType extends FluidType {
 
     @Override
     public Component getDescription(FluidStack stack) {
-        return AlloyPayload.read(stack).map(composition -> {
+        return AlloyPayload.read(stack).<Component>map(composition -> {
             if (composition.ingredients().size() == 1) {
                 return Component.literal("Molten " + displayName(composition.ingredients().get(0)) + " (100%)");
             }
