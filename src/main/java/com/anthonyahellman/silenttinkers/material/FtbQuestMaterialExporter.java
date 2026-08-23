@@ -4,6 +4,9 @@ import com.anthonyahellman.silenttinkers.SilentTinkersMod;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.loading.FMLPaths;
+import slimeknights.tconstruct.library.materials.MaterialRegistry;
+import slimeknights.tconstruct.library.materials.definition.MaterialId;
+import slimeknights.tconstruct.library.materials.stats.HeadMaterialStats;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -18,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /** Generates FTB Quests material circles from the authoritative runtime scan. */
 public final class FtbQuestMaterialExporter {
@@ -32,13 +36,16 @@ public final class FtbQuestMaterialExporter {
 
         List<Entry> core = new ArrayList<>();
         Map<String, List<Entry>> addons = new LinkedHashMap<>();
-        snapshot.evaluations().stream()
-                .filter(MaterialGenerationEvaluation::readyForMutation)
-                .map(MaterialGenerationEvaluation::request)
-                .filter(request -> DynamicBridgeItemPolicy.isOneUnitMaterial(request.physicalItem()))
-                .map(Entry::from)
+        Map<String, Entry> unique = snapshot.evaluations().stream()
+                .filter(evaluation -> evaluation.readyForMutation()
+                        || evaluation.status() == MaterialGenerationEvaluation.Status.TINKERS_SOURCE_READY)
+                .filter(evaluation -> evaluation.status() == MaterialGenerationEvaluation.Status.TINKERS_SOURCE_READY
+                        || DynamicBridgeItemPolicy.isOneUnitMaterial(evaluation.request().physicalItem()))
+                .map(evaluation -> Entry.from(snapshot, evaluation))
                 .sorted(Comparator.comparing(entry -> entry.item().toString()))
-                .forEach(entry -> {
+                .collect(Collectors.toMap(Entry::identity, entry -> entry, (first, ignored) -> first,
+                        LinkedHashMap::new));
+        unique.values().forEach(entry -> {
                     if (entry.isCore()) core.add(entry);
                     else addons.computeIfAbsent(entry.addonNamespace(), ignored -> new ArrayList<>()).add(entry);
                 });
@@ -134,9 +141,10 @@ public final class FtbQuestMaterialExporter {
                     .append("\t\t\tdependencies: [\"").append(GUIDE_UNLOCK_ID).append("\"]\n")
                     .append("\t\t\tdescription: [\n")
                     .append("\t\t\t\t\"Physical item: ").append(escape(entry.item().toString())).append("\"\n")
-                    .append("\t\t\t\t\"Silent Gear material: ").append(escape(entry.material().toString())).append("\"\n")
-                    .append("\t\t\t\t\"This material can be melted into dynamic composite alloy and cast into supported Tinkers parts.\"\n")
-                    .append("\t\t\t]\n")
+                    .append("\t\t\t\t\"Material: ").append(escape(entry.material().toString())).append("\"\n");
+            entry.descriptionLines().forEach(line -> out.append("\t\t\t\t\"")
+                    .append(escape(line)).append("\"\n"));
+            out.append("\t\t\t]\n")
                     .append("\t\t\thide_until_deps_complete: true\n")
                     .append("\t\t\ticon: \"").append(entry.item()).append("\"\n")
                     .append("\t\t\tid: \"").append(id("material:" + entry.item())).append("\"\n")
@@ -197,17 +205,80 @@ public final class FtbQuestMaterialExporter {
         return String.format(Locale.ROOT, "%.1f", value);
     }
 
-    private record Entry(ResourceLocation item, ResourceLocation material) {
-        private static Entry from(MaterialGenerationRequest request) {
-            return new Entry(request.physicalItem(), request.sourceMaterialId().orElseThrow());
+    private record Entry(ResourceLocation item, ResourceLocation material,
+                         MaterialProfile.Ecosystem ecosystem, List<String> descriptionLines) {
+        private static Entry from(UnifiedMaterialDiscovery.Snapshot snapshot,
+                                  MaterialGenerationEvaluation evaluation) {
+            MaterialGenerationRequest request = evaluation.request();
+            ResourceLocation material = request.sourceMaterialId().orElseThrow();
+            MaterialProfile.Ecosystem ecosystem = request.source().orElseThrow();
+            List<String> lines = new ArrayList<>();
+            evaluation.translatedStats().ifPresent(stats -> {
+                lines.add("Head stats - durability " + number(stats.durability())
+                        + ", mining speed " + number(stats.miningSpeed())
+                        + ", melee damage " + number(stats.meleeDamage())
+                        + ", attack speed " + signed(stats.attackSpeed()));
+                lines.add("Harvest tier: " + stats.harvestTier());
+            });
+            evaluation.tinkersSourceStats().ifPresent(stats -> {
+                lines.add("Head stats - durability " + stats.headDurability()
+                        + ", mining speed " + number(stats.headMiningSpeed())
+                        + ", melee damage " + number(stats.headMeleeAttack()));
+                lines.add("Handle modifiers - durability " + percent(stats.handleDurabilityModifier())
+                        + ", mining speed " + percent(stats.handleMiningSpeedModifier())
+                        + ", attack speed " + percent(stats.handleAttackSpeedModifier())
+                        + ", damage " + percent(stats.handleDamageModifier()));
+                lines.add("Harvest tier: " + stats.harvestTier());
+            });
+            List<ResourceLocation> traits = traits(snapshot, request.physicalItem(), material, ecosystem);
+            lines.add(traits.isEmpty() ? "Base head traits: none reported"
+                    : "Base head traits: " + traits.stream().map(ResourceLocation::toString)
+                    .collect(Collectors.joining(", ")));
+            lines.add(ecosystem == MaterialProfile.Ecosystem.TINKERS_CONSTRUCT
+                    ? "Native Tinkers material; values shown are its currently loaded base stats."
+                    : "Silent Gear material; can be melted into dynamic composite alloy for supported Tinkers parts.");
+            return new Entry(request.physicalItem(), material, ecosystem, List.copyOf(lines));
+        }
+
+        private static List<ResourceLocation> traits(UnifiedMaterialDiscovery.Snapshot snapshot,
+                                                     ResourceLocation item, ResourceLocation material,
+                                                     MaterialProfile.Ecosystem ecosystem) {
+            if (ecosystem == MaterialProfile.Ecosystem.TINKERS_CONSTRUCT && MaterialRegistry.isFullyLoaded()) {
+                return MaterialRegistry.getInstance().getTraits(new MaterialId(material), HeadMaterialStats.ID).stream()
+                        .map(entry -> entry.getId().getId()).distinct().toList();
+            }
+            return snapshot.index().get(item)
+                    .map(MaterialCorrelationIndex.Candidate::profiles)
+                    .map(profiles -> profiles.get(ecosystem))
+                    .map(MaterialProfile::traits)
+                    .orElse(List.of());
+        }
+
+        private String identity() {
+            return ecosystem + ":" + material;
         }
 
         private boolean isCore() {
-            return item.getNamespace().equals("minecraft") && material.getNamespace().equals("silentgear");
+            return ecosystem == MaterialProfile.Ecosystem.TINKERS_CONSTRUCT
+                    && material.getNamespace().equals("tconstruct");
         }
 
         private String addonNamespace() {
-            return item.getNamespace().equals("minecraft") ? material.getNamespace() : item.getNamespace();
+            return ecosystem == MaterialProfile.Ecosystem.TINKERS_CONSTRUCT
+                    ? material.getNamespace()
+                    : (item.getNamespace().equals("minecraft") ? material.getNamespace() : item.getNamespace());
         }
+    }
+
+    private static String number(float value) {
+        return String.format(Locale.ROOT, "%.2f", value);
+    }
+
+    private static String signed(float value) {
+        return String.format(Locale.ROOT, "%+.2f", value);
+    }
+
+    private static String percent(float value) {
+        return String.format(Locale.ROOT, "%+.0f%%", value * 100.0f);
     }
 }
