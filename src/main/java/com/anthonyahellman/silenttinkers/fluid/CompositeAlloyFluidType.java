@@ -1,7 +1,10 @@
 package com.anthonyahellman.silenttinkers.fluid;
 
+import com.anthonyahellman.silenttinkers.client.SourceVisualColorResolver;
+import com.anthonyahellman.silenttinkers.material.AlloyPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.client.extensions.common.IClientFluidTypeExtensions;
+import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.FluidType;
 
 import java.util.function.Consumer;
@@ -32,7 +35,14 @@ public final class CompositeAlloyFluidType extends FluidType {
 
             @Override
             public int getTintColor() {
-                return 0xFFB768FF;
+                return SourceVisualColorResolver.FALLBACK_ARGB;
+            }
+
+            @Override
+            public int getTintColor(FluidStack stack) {
+                return AlloyPayload.readVisualSource(stack)
+                        .map(SourceVisualColorResolver::resolve)
+                        .orElse(SourceVisualColorResolver.FALLBACK_ARGB);
             }
         });
     }
