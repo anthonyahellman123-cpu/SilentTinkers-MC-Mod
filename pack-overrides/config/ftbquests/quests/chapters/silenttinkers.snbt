@@ -1,0 +1,135 @@
+{
+	default_hide_dependency_lines: false
+	default_quest_shape: "hexagon"
+	filename: "silenttinkers"
+	icon: "silenttinkers:composite_alloy_sample"
+	id: "51A17E17A5C0DE01"
+	order_index: 0
+	progression_mode: "flexible"
+	quest_links: [ ]
+	quests: [
+		{
+			description: [
+				"&dSilentTinkers&r creates a living compatibility bridge between Silent Gear and Tinkers' Construct."
+				""
+				"Click the checkmark below once to open the material guide. This is only an acknowledgement button; it consumes nothing and gives no item reward."
+				""
+				"&7One material, two systems, and a frankly unreasonable number of handshakes.&r"
+			]
+			icon: "silenttinkers:composite_alloy_sample"
+			id: "51A17E17A5C0DE02"
+			shape: "gear"
+			size: 2.0d
+			subtitle: "Open the material compatibility guide"
+			tasks: [{
+				id: "51A17E17A5C0DE03"
+				title: "Open the Handshake"
+				type: "checkmark"
+			}]
+			title: "Open the Handshake"
+			x: 0.0d
+			y: 0.0d
+		}
+		{
+			dependencies: ["51A17E17A5C0DE02"]
+			description: [
+				"&6The basic loop&r"
+				""
+				"1. Choose an ingot or material recognized by Silent Gear."
+				"2. Melt it in a Tinkers melter or smeltery."
+				"3. Cast the molten composite into a compatible Tinkers tool part."
+				"4. Assemble it with any other valid Tinkers materials."
+				""
+				"The molten fluid, cast part, and completed tool preserve their dynamic composition and calculated stats."
+			]
+			hide_until_deps_complete: true
+			icon: "tconstruct:smeltery_controller"
+			id: "51A17E17A5C0DE10"
+			title: "Getting Started"
+			x: 0.0d
+			y: -4.0d
+		}
+		{
+			dependencies: ["51A17E17A5C0DE02"]
+			description: [
+				"&bSilent Gear materials&r"
+				""
+				"SilentTinkers discovers Silent Gear materials and compatible add-on materials at runtime instead of relying on one hard-coded ingot list."
+				""
+				"A material with a physical item and readable Silent Gear stats can become a dynamic Tinkers material. Existing native compatibility is preserved instead of replaced."
+			]
+			hide_until_deps_complete: true
+			icon: "silentgear:blueprint_book"
+			id: "51A17E17A5C0DE11"
+			title: "Silent Gear Materials"
+			x: -4.0d
+			y: -2.0d
+		}
+		{
+			dependencies: ["51A17E17A5C0DE02"]
+			description: [
+				"&dDynamic alloys&r"
+				""
+				"Compound Silent Gear alloys retain their exact component ratios when melted. Their numerical stats are evaluated by Silent Gear, while eligible native Tinkers traits are unlocked according to the configured material percentages."
+				""
+				"The visible molten color and Tinkers part color are mixed from the source materials instead of using a universal placeholder color."
+			]
+			hide_until_deps_complete: true
+			icon: "silenttinkers:composite_alloy_sample"
+			id: "51A17E17A5C0DE12"
+			title: "Dynamic Alloys"
+			x: 4.0d
+			y: -2.0d
+		}
+		{
+			dependencies: ["51A17E17A5C0DE02"]
+			description: [
+				"&5Material grades&r"
+				""
+				"Grade the source material before melting it. SilentTinkers preserves the grade and asks Silent Gear to apply its native grade rules to the resulting Tinkers material stats."
+				""
+				"E +1%  •  D +2%  •  C +3%  •  B +4%  •  A +5%"
+				"S +10%  •  SS +15%  •  SSS +25%  •  MAX +30%"
+			]
+			hide_until_deps_complete: true
+			icon: "silentgear:material_grader"
+			id: "51A17E17A5C0DE13"
+			title: "Grades"
+			x: -4.0d
+			y: 2.0d
+		}
+		{
+			dependencies: ["51A17E17A5C0DE02"]
+			description: [
+				"&9Starcharging&r"
+				""
+				"A composite Tinkers part or an assembled tool containing one can be placed directly into Silent Gear's Material Charger."
+				""
+				"The normal charger structure, night-sky access, catalyst tiers, stored starlight, and work time still apply. On completion, SilentTinkers rebuilds the composite stats without replacing the other Tinkers parts or modifiers."
+			]
+			hide_until_deps_complete: true
+			icon: "silentgear:starlight_charger"
+			id: "51A17E17A5C0DE14"
+			title: "Starcharging"
+			x: 4.0d
+			y: 2.0d
+		}
+		{
+			dependencies: ["51A17E17A5C0DE02"]
+			description: [
+				"&aTinkers and add-on materials&r"
+				""
+				"Tinkers add-on materials are discovered alongside base Tinkers materials. Native Tinkers traits stay authoritative; SilentTinkers never flattens every special effect into generic numbers."
+				""
+				"Reverse conversion into Silent Gear is tracked separately because Tinkers traits often depend on live tool context and cannot be copied safely as plain NBT."
+			]
+			hide_until_deps_complete: true
+			icon: "tconstruct:encyclopedia"
+			id: "51A17E17A5C0DE15"
+			title: "Tinkers & Add-on Materials"
+			x: 0.0d
+			y: 4.0d
+		}
+	]
+	title: "SilentTinkers Materials"
+}

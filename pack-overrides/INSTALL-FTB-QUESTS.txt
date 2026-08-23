@@ -1,0 +1,10 @@
+SilentTinkers FTB Quests tab (Forge 1.20.1 / FTB Quests 2001.4.x)
+
+1. Close Minecraft.
+2. Open the CurseForge profile folder for the SilentTinkers Modpack.
+3. Copy the included config folder into that profile's root folder.
+4. Allow folders to merge if Windows asks. This pack does not contain a book item.
+5. Start Minecraft and open the normal FTB Quests screen.
+6. Click the SilentTinkers Materials tab, then click Open the Handshake once.
+
+For an existing world/server, run /ftbquests reload after installing or restart it.
