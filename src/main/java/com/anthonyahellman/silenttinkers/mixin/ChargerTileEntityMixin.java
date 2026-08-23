@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /** Narrow extensions to Silent Gear's existing starlight charger lifecycle. */
-@Mixin(value = ChargerTileEntity.class, remap = false)
+@Mixin(ChargerTileEntity.class)
 public abstract class ChargerTileEntityMixin {
     @Inject(method = "canPlaceItem", at = @At("HEAD"), cancellable = true)
     private void silenttinkers$allowCompositeInput(int slot, ItemStack stack,
@@ -24,12 +24,13 @@ public abstract class ChargerTileEntityMixin {
     }
 
     @Redirect(method = "tick", at = @At(value = "INVOKE",
-            target = "Lnet/silentchaos512/gear/api/GearApi;isMaterial(Lnet/minecraft/world/item/ItemStack;)Z"))
+            target = "Lnet/silentchaos512/gear/api/GearApi;isMaterial(Lnet/minecraft/world/item/ItemStack;)Z"),
+            remap = false)
     private static boolean silenttinkers$treatCompositeAsMaterial(ItemStack stack) {
         return GearApi.isMaterial(stack) || CompositeStarChargeService.canBeginCharging(stack);
     }
 
-    @Inject(method = "canCharge", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "canCharge", at = @At("HEAD"), cancellable = true, remap = false)
     private static void silenttinkers$allowCompositeCharge(ItemStack stack,
                                                             CallbackInfoReturnable<Boolean> callback) {
         if (CompositeStarChargeService.isComposite(stack)) {
@@ -37,7 +38,7 @@ public abstract class ChargerTileEntityMixin {
         }
     }
 
-    @Inject(method = "getWorkTime", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "getWorkTime", at = @At("HEAD"), cancellable = true, remap = false)
     private void silenttinkers$compositeWorkTime(ItemStack stack,
                                                  CallbackInfoReturnable<Integer> callback) {
         if (CompositeStarChargeService.isComposite(stack)) {
@@ -45,7 +46,7 @@ public abstract class ChargerTileEntityMixin {
         }
     }
 
-    @Inject(method = "getMaterialChargeLevel", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "getMaterialChargeLevel", at = @At("HEAD"), cancellable = true, remap = false)
     private void silenttinkers$readCompositeCharge(ItemStack stack,
                                                    CallbackInfoReturnable<Integer> callback) {
         if (CompositeStarChargeService.isComposite(stack)) {
@@ -53,7 +54,7 @@ public abstract class ChargerTileEntityMixin {
         }
     }
 
-    @Inject(method = "chargeMaterial", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "chargeMaterial", at = @At("HEAD"), cancellable = true, remap = false)
     private void silenttinkers$chargeComposite(ItemStack output, int level, CallbackInfo callback) {
         if (CompositeStarChargeService.isComposite(output)) {
             CompositeStarChargeService.applyCharge(output, level);

@@ -8,7 +8,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /** Allows validated composite parts/tools into the charger's input GUI slot. */
-@Mixin(targets = "net.silentchaos512.gear.block.charger.ChargerContainer$1", remap = false)
+@Mixin(targets = "net.silentchaos512.gear.block.charger.ChargerContainer$1")
 public abstract class ChargerInputSlotMixin {
     @Inject(method = "mayPlace", at = @At("HEAD"), cancellable = true)
     private void silenttinkers$allowCompositeInput(ItemStack stack,
