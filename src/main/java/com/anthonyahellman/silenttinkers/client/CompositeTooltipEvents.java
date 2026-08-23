@@ -9,6 +9,7 @@ import com.anthonyahellman.silenttinkers.recipe.CompositePickHeadCastingRecipe;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.entity.player.ItemTooltipEvent;
@@ -24,11 +25,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Client-only development diagnostics for synthetic composite parts and tools.
- * Keeping tooltip code out of common mod initialization also guarantees the
- * dedicated-server path never has to load this class.
- */
+/** Client-only development diagnostics for synthetic composite parts and tools. */
 @Mod.EventBusSubscriber(modid = SilentTinkersMod.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class CompositeTooltipEvents {
     private static final Set<String> LOGGED_TOOL_OBSERVATIONS = ConcurrentHashMap.newKeySet();
@@ -42,15 +39,12 @@ public final class CompositeTooltipEvents {
             appendCompositePartTooltip(event, stack);
             return;
         }
-        if (stack.getItem() instanceof IModifiable) {
-            appendCompositeToolTooltip(event, stack);
-        }
+        if (stack.getItem() instanceof IModifiable) appendCompositeToolTooltip(event, stack);
     }
 
     private static void appendCompositePartTooltip(ItemTooltipEvent event, ItemStack stack) {
         AlloyPayload.read(stack).ifPresent(composition -> {
-            event.getToolTip().add(Component.literal("SilentTinkers dynamic payload")
-                    .withStyle(ChatFormatting.GOLD));
+            event.getToolTip().add(Component.literal("SilentTinkers dynamic payload").withStyle(ChatFormatting.GOLD));
             for (MaterialIngredient ingredient : composition.ingredients()) {
                 double percent = 100.0 * ingredient.units() / composition.totalUnits();
                 event.getToolTip().add(Component.literal(String.format("%s: %.1f%%", ingredient.materialId(), percent))
@@ -73,12 +67,9 @@ public final class CompositeTooltipEvents {
                 break;
             }
         }
-        if (composite == null) {
-            return;
-        }
+        if (composite == null) return;
 
-        event.getToolTip().add(Component.literal("SilentTinkers assembled-tool diagnostic")
-                .withStyle(ChatFormatting.GOLD));
+        event.getToolTip().add(Component.literal("SilentTinkers assembled-tool diagnostic").withStyle(ChatFormatting.GOLD));
 
         boolean modifierPresent = tool.getModifiers().getModifiers().stream()
                 .anyMatch(entry -> entry.getId().toString().equals(SilentTinkersMod.MOD_ID + ":composite_alloy"));
@@ -87,11 +78,15 @@ public final class CompositeTooltipEvents {
 
         String variant = composite.getVariant().getVariant();
         Optional<AlloyStatSnapshot> encodedStats = Optional.empty();
+        Optional<ResourceLocation> visualSourceId = Optional.empty();
         try {
             encodedStats = AlloyVariantCodec.decodeStats(variant);
+            visualSourceId = AlloyVariantCodec.decodeVisualSourceItemId(variant);
+            event.getToolTip().add(Component.literal("Visual source: "
+                            + visualSourceId.map(Object::toString).orElse("NOT ENCODED"))
+                    .withStyle(visualSourceId.isPresent() ? ChatFormatting.AQUA : ChatFormatting.DARK_GRAY));
             if (encodedStats.isPresent()) {
-                event.getToolTip().add(Component.literal("Variant stats: PRESENT")
-                        .withStyle(ChatFormatting.GREEN));
+                event.getToolTip().add(Component.literal("Variant stats: PRESENT").withStyle(ChatFormatting.GREEN));
                 AlloyStatSnapshot stats = encodedStats.orElseThrow();
                 event.getToolTip().add(Component.literal(
                                 "Encoded head: durability " + stats.durability()
@@ -101,12 +96,10 @@ public final class CompositeTooltipEvents {
                                         + ", tier " + stats.harvestTier())
                         .withStyle(ChatFormatting.DARK_GRAY));
             } else {
-                event.getToolTip().add(Component.literal("Variant stats: MISSING")
-                        .withStyle(ChatFormatting.RED));
+                event.getToolTip().add(Component.literal("Variant stats: MISSING").withStyle(ChatFormatting.RED));
             }
         } catch (IllegalArgumentException exception) {
-            event.getToolTip().add(Component.literal("Variant stats: INVALID")
-                    .withStyle(ChatFormatting.RED));
+            event.getToolTip().add(Component.literal("Variant payload: INVALID").withStyle(ChatFormatting.RED));
         }
 
         float finalDurability = tool.getStats().get(ToolStats.DURABILITY);
@@ -115,24 +108,19 @@ public final class CompositeTooltipEvents {
         float finalAttackSpeed = tool.getStats().get(ToolStats.ATTACK_SPEED);
         Object finalHarvestTier = tool.getStats().get(ToolStats.HARVEST_TIER);
 
-        event.getToolTip().add(Component.literal("Final durability: " + finalDurability)
-                .withStyle(ChatFormatting.GRAY));
-        event.getToolTip().add(Component.literal("Final mining speed: " + finalMiningSpeed)
-                .withStyle(ChatFormatting.GRAY));
-        event.getToolTip().add(Component.literal("Final melee damage: " + finalMeleeDamage)
-                .withStyle(ChatFormatting.GRAY));
-        event.getToolTip().add(Component.literal("Final attack speed: " + finalAttackSpeed)
-                .withStyle(ChatFormatting.GRAY));
-        event.getToolTip().add(Component.literal("Final harvest tier: " + finalHarvestTier)
-                .withStyle(ChatFormatting.GRAY));
+        event.getToolTip().add(Component.literal("Final durability: " + finalDurability).withStyle(ChatFormatting.GRAY));
+        event.getToolTip().add(Component.literal("Final mining speed: " + finalMiningSpeed).withStyle(ChatFormatting.GRAY));
+        event.getToolTip().add(Component.literal("Final melee damage: " + finalMeleeDamage).withStyle(ChatFormatting.GRAY));
+        event.getToolTip().add(Component.literal("Final attack speed: " + finalAttackSpeed).withStyle(ChatFormatting.GRAY));
+        event.getToolTip().add(Component.literal("Final harvest tier: " + finalHarvestTier).withStyle(ChatFormatting.GRAY));
 
         String observationKey = BuiltInRegistries.ITEM.getKey(stack.getItem()) + "|" + composite.getVariant();
         if (LOGGED_TOOL_OBSERVATIONS.add(observationKey)) {
             SilentTinkersMod.LOGGER.info(
-                    "[SilentTinkers:COMPOSITE_TOOL_OBSERVED] tool={} variant={} modifierPresent={} encodedStatsPresent={} finalDurability={} finalMiningSpeed={} finalMeleeDamage={} finalAttackSpeed={} finalHarvestTier={}",
+                    "[SilentTinkers:COMPOSITE_TOOL_OBSERVED] tool={} variant={} modifierPresent={} encodedStatsPresent={} visualSource={} finalDurability={} finalMiningSpeed={} finalMeleeDamage={} finalAttackSpeed={} finalHarvestTier={}",
                     BuiltInRegistries.ITEM.getKey(stack.getItem()), composite.getVariant(), modifierPresent,
-                    encodedStats.isPresent(), finalDurability, finalMiningSpeed, finalMeleeDamage,
-                    finalAttackSpeed, finalHarvestTier);
+                    encodedStats.isPresent(), visualSourceId.map(Object::toString).orElse("NONE"),
+                    finalDurability, finalMiningSpeed, finalMeleeDamage, finalAttackSpeed, finalHarvestTier);
         }
     }
 
