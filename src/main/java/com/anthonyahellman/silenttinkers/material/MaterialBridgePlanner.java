@@ -19,10 +19,6 @@ public final class MaterialBridgePlanner {
         Map<PlanKey, MaterialBridgePlan> plans = new LinkedHashMap<>();
         Set<ProfileKey> correlatedProfiles = new LinkedHashSet<>();
 
-        // First establish every material identity that already has valid native
-        // compatibility. One-sided aliases of these same identities must never
-        // create a second BRIDGE plan later (e.g. blocks/nuggets/tags that do not
-        // happen to overlap even though an ingot already proves correlation).
         for (MaterialCorrelationIndex.Candidate candidate : snapshot.correlated()) {
             Map<MaterialProfile.Ecosystem, MaterialProfile> profiles = candidate.profiles();
             MaterialProfile sg = profiles.get(MaterialProfile.Ecosystem.SILENT_GEAR);
@@ -34,34 +30,29 @@ public final class MaterialBridgePlanner {
             plans.putIfAbsent(key, new MaterialBridgePlan(
                     canonicalPhysicalItem(snapshot, candidate, sg, tc),
                     MaterialBridgePlan.Action.PRESERVE,
-                    Optional.empty(), Optional.empty(), MaterialBridgePlan.Reason.BOTH_PRESENT));
+                    Optional.empty(), Optional.empty(),
+                    Optional.empty(), Optional.empty(),
+                    MaterialBridgePlan.Reason.BOTH_PRESENT));
         }
 
         for (MaterialCorrelationIndex.Candidate candidate : snapshot.bridgeCandidates()) {
             Map<MaterialProfile.Ecosystem, MaterialProfile> profiles = candidate.profiles();
             MaterialProfile profile = profiles.values().iterator().next();
-
-            // Native compatibility proven anywhere for this material identity
-            // wins over every one-sided alias. This is the canonical-material
-            // equivalent of "preserve existing compat".
             if (correlatedProfiles.contains(ProfileKey.of(profile))) continue;
 
             PlanKey key = PlanKey.single(profile.ecosystem(), profile.materialId());
-            if (profile.ecosystem() == MaterialProfile.Ecosystem.SILENT_GEAR) {
-                plans.putIfAbsent(key, new MaterialBridgePlan(
-                        canonicalPhysicalItem(snapshot, candidate, profile),
-                        MaterialBridgePlan.Action.BRIDGE,
-                        Optional.of(MaterialProfile.Ecosystem.SILENT_GEAR),
-                        Optional.of(MaterialProfile.Ecosystem.TINKERS_CONSTRUCT),
-                        MaterialBridgePlan.Reason.SILENT_GEAR_ONLY));
-            } else {
-                plans.putIfAbsent(key, new MaterialBridgePlan(
-                        canonicalPhysicalItem(snapshot, candidate, profile),
-                        MaterialBridgePlan.Action.BRIDGE,
-                        Optional.of(MaterialProfile.Ecosystem.TINKERS_CONSTRUCT),
-                        Optional.of(MaterialProfile.Ecosystem.SILENT_GEAR),
-                        MaterialBridgePlan.Reason.TINKERS_ONLY));
-            }
+            MaterialProfile.Ecosystem target = profile.ecosystem() == MaterialProfile.Ecosystem.SILENT_GEAR
+                    ? MaterialProfile.Ecosystem.TINKERS_CONSTRUCT
+                    : MaterialProfile.Ecosystem.SILENT_GEAR;
+            MaterialBridgePlan.Reason reason = profile.ecosystem() == MaterialProfile.Ecosystem.SILENT_GEAR
+                    ? MaterialBridgePlan.Reason.SILENT_GEAR_ONLY
+                    : MaterialBridgePlan.Reason.TINKERS_ONLY;
+
+            plans.putIfAbsent(key, new MaterialBridgePlan(
+                    canonicalPhysicalItem(snapshot, candidate, profile),
+                    MaterialBridgePlan.Action.BRIDGE,
+                    Optional.of(profile.ecosystem()), Optional.of(target),
+                    Optional.of(profile.materialId()), Optional.empty(), reason));
         }
 
         List<MaterialBridgePlan> result = new ArrayList<>(plans.values());
@@ -69,11 +60,6 @@ public final class MaterialBridgePlanner {
         return List.copyOf(result);
     }
 
-    /**
-     * Prefer a useful concrete representative but never select an alias that the
-     * correlation index marked ambiguous. The fallback candidate itself is known
-     * safe because correlated/bridge candidate lists exclude ambiguous entries.
-     */
     private static ResourceLocation canonicalPhysicalItem(UnifiedMaterialDiscovery.Snapshot snapshot,
             MaterialCorrelationIndex.Candidate fallback, MaterialProfile... profiles) {
         Set<ResourceLocation> aliases = new LinkedHashSet<>();
@@ -114,6 +100,7 @@ public final class MaterialBridgePlanner {
 
     public static MaterialBridgePlan bootstrap(ResourceLocation physicalItem) {
         return new MaterialBridgePlan(physicalItem, MaterialBridgePlan.Action.BOOTSTRAP,
-                Optional.empty(), Optional.empty(), MaterialBridgePlan.Reason.EXTERNAL_MATERIAL);
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                MaterialBridgePlan.Reason.EXTERNAL_MATERIAL);
     }
 }
