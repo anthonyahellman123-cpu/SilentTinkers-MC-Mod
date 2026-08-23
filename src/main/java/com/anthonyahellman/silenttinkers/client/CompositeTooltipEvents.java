@@ -5,11 +5,11 @@ import com.anthonyahellman.silenttinkers.material.AlloyPayload;
 import com.anthonyahellman.silenttinkers.material.AlloyStatSnapshot;
 import com.anthonyahellman.silenttinkers.material.AlloyVariantCodec;
 import com.anthonyahellman.silenttinkers.material.MaterialIngredient;
+import com.anthonyahellman.silenttinkers.material.SourceVisualIdentity;
 import com.anthonyahellman.silenttinkers.recipe.CompositePickHeadCastingRecipe;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.entity.player.ItemTooltipEvent;
@@ -50,10 +50,13 @@ public final class CompositeTooltipEvents {
                 event.getToolTip().add(Component.literal(String.format("%s: %.1f%%", ingredient.materialId(), percent))
                         .withStyle(ChatFormatting.GRAY));
             }
-            AlloyPayload.readVisualSource(stack).ifPresent(visual -> event.getToolTip().add(
-                    Component.literal("Visual source: " + visual.itemId()
-                                    + (visual.itemTag().isPresent() ? " (dynamic tag preserved)" : ""))
-                            .withStyle(ChatFormatting.AQUA)));
+            AlloyPayload.readVisualSource(stack).ifPresent(visual -> {
+                event.getToolTip().add(Component.literal("Visual source: " + visual.itemId()
+                                + (visual.itemTag().isPresent() ? " (dynamic tag preserved)" : ""))
+                        .withStyle(ChatFormatting.AQUA));
+                event.getToolTip().add(Component.literal("Visual sample: " + hexColor(SourceVisualColorResolver.resolve(visual)))
+                        .withStyle(ChatFormatting.DARK_AQUA));
+            });
             AlloyPayload.readStats(stack).ifPresent(stats -> appendDynamicStats(event, stats));
         });
     }
@@ -78,13 +81,22 @@ public final class CompositeTooltipEvents {
 
         String variant = composite.getVariant().getVariant();
         Optional<AlloyStatSnapshot> encodedStats = Optional.empty();
-        Optional<ResourceLocation> visualSourceId = Optional.empty();
+        Optional<SourceVisualIdentity> visualSource = Optional.empty();
+        int visualColor = SourceVisualColorResolver.FALLBACK_ARGB;
         try {
             encodedStats = AlloyVariantCodec.decodeStats(variant);
-            visualSourceId = AlloyVariantCodec.decodeVisualSourceItemId(variant);
+            visualSource = AlloyVariantCodec.decodeVisualSource(variant);
+            Optional<SourceVisualIdentity> observedVisualSource = visualSource;
             event.getToolTip().add(Component.literal("Visual source: "
-                            + visualSourceId.map(Object::toString).orElse("NOT ENCODED"))
-                    .withStyle(visualSourceId.isPresent() ? ChatFormatting.AQUA : ChatFormatting.DARK_GRAY));
+                            + observedVisualSource.map(SourceVisualIdentity::itemId).map(Object::toString).orElse("NOT ENCODED")
+                            + observedVisualSource.filter(source -> source.itemTag().isPresent())
+                                    .map(source -> " (dynamic tag encoded)").orElse(""))
+                    .withStyle(observedVisualSource.isPresent() ? ChatFormatting.AQUA : ChatFormatting.DARK_GRAY));
+            if (visualSource.isPresent()) {
+                visualColor = SourceVisualColorResolver.resolve(visualSource.orElseThrow());
+                event.getToolTip().add(Component.literal("Visual sample: " + hexColor(visualColor))
+                        .withStyle(ChatFormatting.DARK_AQUA));
+            }
             if (encodedStats.isPresent()) {
                 event.getToolTip().add(Component.literal("Variant stats: PRESENT").withStyle(ChatFormatting.GREEN));
                 AlloyStatSnapshot stats = encodedStats.orElseThrow();
@@ -117,11 +129,16 @@ public final class CompositeTooltipEvents {
         String observationKey = BuiltInRegistries.ITEM.getKey(stack.getItem()) + "|" + composite.getVariant();
         if (LOGGED_TOOL_OBSERVATIONS.add(observationKey)) {
             SilentTinkersMod.LOGGER.info(
-                    "[SilentTinkers:COMPOSITE_TOOL_OBSERVED] tool={} variant={} modifierPresent={} encodedStatsPresent={} visualSource={} finalDurability={} finalMiningSpeed={} finalMeleeDamage={} finalAttackSpeed={} finalHarvestTier={}",
+                    "[SilentTinkers:COMPOSITE_TOOL_OBSERVED] tool={} variant={} modifierPresent={} encodedStatsPresent={} visualSource={} visualTagPresent={} visualColor={} finalDurability={} finalMiningSpeed={} finalMeleeDamage={} finalAttackSpeed={} finalHarvestTier={}",
                     BuiltInRegistries.ITEM.getKey(stack.getItem()), composite.getVariant(), modifierPresent,
-                    encodedStats.isPresent(), visualSourceId.map(Object::toString).orElse("NONE"),
+                    encodedStats.isPresent(), visualSource.map(SourceVisualIdentity::itemId).map(Object::toString).orElse("NONE"),
+                    visualSource.filter(source -> source.itemTag().isPresent()).isPresent(), hexColor(visualColor),
                     finalDurability, finalMiningSpeed, finalMeleeDamage, finalAttackSpeed, finalHarvestTier);
         }
+    }
+
+    private static String hexColor(int argb) {
+        return String.format("#%06X", argb & 0xFFFFFF);
     }
 
     private static void appendDynamicStats(ItemTooltipEvent event, AlloyStatSnapshot stats) {
