@@ -107,12 +107,13 @@ public final class UnifiedMaterialDiscovery {
         MaterialDiscoveryState.publish(completedSnapshot);
         int runtimeReady = MaterialDiscoveryState.readyForTinkersCount();
         long deferredPhysicalForm = Math.max(0L, completedSnapshot.readyForMutationCount() - runtimeReady);
+        String planFingerprint = MaterialPlanFingerprint.of(completedSnapshot);
         SilentTinkersMod.LOGGER.info(
                 "[SilentTinkers:RUNTIME_INDEX] dynamicTinkersMaterials={} deferredPhysicalForm={} -- eligible materials use tagged-fluid casting",
                 runtimeReady, deferredPhysicalForm);
         logStartupSummary(silentGear, tinkers, preserved, readyForTinkers, runtimeReady,
                 deferredPhysicalForm, tinkersSourceReady, bootstrapPending,
-                requestQuarantined, ambiguous.size());
+                requestQuarantined, ambiguous.size(), planFingerprint);
         return completedSnapshot;
     }
 
@@ -125,11 +126,12 @@ public final class UnifiedMaterialDiscovery {
                                           int tinkersSourceReady,
                                           int bootstrapPending,
                                           int requestQuarantined,
-                                          int aliasQuarantined) {
+                                          int aliasQuarantined,
+                                          String planFingerprint) {
         int quarantined = requestQuarantined + aliasQuarantined;
         SilentTinkersMod.LOGGER.info(
-                "[SilentTinkers:STARTUP_SUMMARY] SG={} TCon={} preserved={} bridgeToTinkers={} runtimeReady={} deferredPhysicalForm={} tinkersSourceReady={} bootstrapPending={} quarantined={} status=READY",
-                silentGear.materials(), tinkers.materials(), preserved, readyForTinkers, runtimeReady,
+                "[SilentTinkers:STARTUP_SUMMARY] plan={} SG={} TCon={} preserved={} bridgeToTinkers={} runtimeReady={} deferredPhysicalForm={} tinkersSourceReady={} bootstrapPending={} quarantined={} status=READY",
+                planFingerprint, silentGear.materials(), tinkers.materials(), preserved, readyForTinkers, runtimeReady,
                 deferredPhysicalForm, tinkersSourceReady, bootstrapPending, quarantined);
     }
 
