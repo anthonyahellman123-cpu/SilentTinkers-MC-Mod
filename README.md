@@ -55,27 +55,56 @@ composition payload instead.
 ## Current in-game validation
 
 The alpha produces both a diagnostic `Composite Alloy Sample` and a real
-`tconstruct:pick_head`. The sample now displays the exact Silent Gear stats
-captured before melting; the completed tool applies the same snapshot.
+`tconstruct:pick_head`. A real Botania Elementium test has already confirmed the
+runtime discovery, Silent Gear stat read, dynamic melting, fluid payload, sample
+payload, and encoded pick-head material variant. The remaining active validation
+is the final Tinkers tool-rebuild handoff that attaches the composite modifier
+and applies the encoded head stats to the assembled tool.
 
 1. Install Silent Tinkers with the compatibility baseline mods listed above.
-2. Make a `silentgear:alloy_ingot` through Silent Gear's normal alloy system.
-3. Melt one ingot in a Tinkers smeltery or melter at 1200 C or hotter.
+2. Make a `silentgear:alloy_ingot` through Silent Gear's normal alloy system, or
+   use a discovered one-unit material form such as a supported ingot/gem/crystal.
+3. Melt one supported material unit in a Tinkers smeltery or melter at the
+   required temperature.
 4. Pour one ingot (90 mB) into an empty casting table with no cast. Hover the
-   resulting sample; its tooltip should list the canonical material
-   IDs, percentages, composition fingerprint, and a gold "Silent Gear evaluated
-   stats" section. If that stats section is absent, do not continue: the runtime
-   Silent Gear API bridge needs adjustment for the installed version.
+   resulting sample; its tooltip should list the canonical material IDs,
+   percentages, composition fingerprint, and the evaluated numeric stats.
 5. For the real-part test, put a reusable pick head cast on the table and pour
    two ingots (180 mB). The output should be a purple `tconstruct:pick_head`
-   whose `Material` NBT begins with
-   `silenttinkers:composite_alloy#v1.`.
-6. Build a normal Tinkers pickaxe with that head. Its head contribution now uses
-   the captured Silent Gear durability, mining speed, melee damage, attack speed,
-   and harvest tier, while its handle and binding still use normal Tinkers math.
-7. Check the completed tool's modifiers. Each ingredient gets zero, one, two, or
-   all matching native head traits according to its alloy percentage and the
-   server config in `serverconfig/silenttinkers-server.toml`.
+   whose `Material` NBT begins with `silenttinkers:composite_alloy#v1.`. Its
+   development tooltip also shows the encoded dynamic payload directly.
+6. Build a normal Tinkers pickaxe with that head. Hovering a finished tool that
+   still contains the composite material shows a development diagnostic with:
+   composite modifier binding, encoded-variant presence, and final Tinkers tool
+   stats. The same observation is logged once as
+   `[SilentTinkers:COMPOSITE_TOOL_OBSERVED]`.
+7. Check `latest.log` for `[SilentTinkers:COMPOSITE_TRAIT_BOUND]`,
+   `[SilentTinkers:COMPOSITE_STATS_APPLIED]`, and the assembled-tool observation.
+   Missing or mismatch diagnostics identify the failed handoff explicitly.
+
+The first runtime bridge intentionally does **not** treat ore blocks, storage
+blocks, nuggets, plates, planks, or arbitrary components as one ingot. Only
+safe one-unit material forms are exposed until unit-aware/tag-driven conversion
+is implemented. This prevents an ore or storage block from accidentally melting
+for the value of a single ingot.
+
+## Server diagnostics
+
+Silent Tinkers publishes an immutable material-plan snapshot after each complete
+scan. Two commands expose the useful parts without requiring Java knowledge:
+
+- `/silenttinkers status` shows the current plan fingerprint, Silent Gear and
+  Tinkers material counts, preserved compatibility, bridge counts, runtime-ready
+  materials, deferred physical forms, bootstrap work, and quarantined requests.
+- `/silenttinkers inspect` inspects the material item held in the player's main
+  hand. It shows the selected bridge action, source ecosystem/material ID,
+  target, evaluation status/detail, translated head stats when available, and
+  whether that exact physical form is active in the dynamic smeltery bridge.
+
+Startup also emits `[SilentTinkers:STARTUP_SUMMARY]` with the same short plan
+fingerprint. If two restarts have the same fingerprint, their logical bridge
+plan is identical even if unrelated log ordering changes. A mod/material change
+that alters the plan changes the fingerprint.
 
 Default trait gates are 25% for the first trait, 50% for the first two traits,
 and 75% for the complete trait package. Set all three values to `0` for the
