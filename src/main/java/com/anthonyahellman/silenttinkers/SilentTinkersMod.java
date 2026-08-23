@@ -1,5 +1,6 @@
 package com.anthonyahellman.silenttinkers;
 
+import com.anthonyahellman.silenttinkers.command.SilentTinkersCommands;
 import com.anthonyahellman.silenttinkers.config.SilentTinkersConfig;
 import com.anthonyahellman.silenttinkers.material.MaterialDiscoveryState;
 import com.anthonyahellman.silenttinkers.material.UnifiedMaterialDiscovery;
@@ -12,6 +13,7 @@ import com.anthonyahellman.silenttinkers.registry.ModRecipes;
 import com.mojang.logging.LogUtils;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.OnDatapackSyncEvent;
+import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModLoadingContext;
@@ -42,6 +44,7 @@ public final class SilentTinkersMod {
         ModModifiers.MODIFIERS.register(modBus);
 
         MinecraftForge.EVENT_BUS.addListener(this::onDatapackSync);
+        MinecraftForge.EVENT_BUS.addListener(this::onRegisterCommands);
         MinecraftForge.EVENT_BUS.addListener(this::onServerStopped);
         LOGGER.info("Silent Tinkers compatibility bridge loaded");
     }
@@ -59,6 +62,10 @@ public final class SilentTinkersMod {
             MaterialDiscoveryState.clear();
             LOGGER.error("[SilentTinkers:SCAN_FAILED] Material discovery failed; automatic bridging disabled until a later successful scan", exception);
         }
+    }
+
+    private void onRegisterCommands(RegisterCommandsEvent event) {
+        SilentTinkersCommands.register(event);
     }
 
     private static void validateCompositeTraitBinding() {
