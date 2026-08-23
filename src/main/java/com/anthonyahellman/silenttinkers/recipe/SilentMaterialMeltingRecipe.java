@@ -5,6 +5,7 @@ import com.anthonyahellman.silenttinkers.material.AlloyPayload;
 import com.anthonyahellman.silenttinkers.material.DynamicTinkersBridgePayload;
 import com.anthonyahellman.silenttinkers.material.MaterialDiscoveryState;
 import com.anthonyahellman.silenttinkers.material.MaterialGenerationEvaluation;
+import com.anthonyahellman.silenttinkers.material.SourceVisualIdentity;
 import com.anthonyahellman.silenttinkers.registry.ModFluids;
 import com.anthonyahellman.silenttinkers.registry.ModRecipes;
 import net.minecraft.core.NonNullList;
@@ -48,12 +49,14 @@ public final class SilentMaterialMeltingRecipe implements IMeltingRecipe {
 
     @Override
     public FluidStack getOutput(IMeltingContainer inventory) {
-        Optional<DynamicTinkersBridgePayload> payload = findReadyEvaluation(inventory.getStack())
+        ItemStack sourceStack = inventory.getStack();
+        Optional<DynamicTinkersBridgePayload> payload = findReadyEvaluation(sourceStack)
                 .flatMap(DynamicTinkersBridgePayload::from);
         if (payload.isEmpty()) return FluidStack.EMPTY;
 
         FluidStack output = new FluidStack(ModFluids.MOLTEN_COMPOSITE_ALLOY.get(), FluidValues.INGOT);
-        AlloyPayload.write(output, payload.get().composition(), 0, Optional.of(payload.get().stats()));
+        AlloyPayload.write(output, payload.get().composition(), 0, Optional.of(payload.get().stats()),
+                SourceVisualIdentity.capture(sourceStack));
         return output;
     }
 
