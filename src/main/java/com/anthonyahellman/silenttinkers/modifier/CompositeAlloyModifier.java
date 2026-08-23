@@ -52,14 +52,10 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
     @Override
     public void addTraits(IToolContext context, ModifierEntry modifier, TraitBuilder builder,
                           boolean firstEncounter) {
-        if (!firstEncounter) {
-            return;
-        }
+        if (!firstEncounter) return;
         IMaterialRegistry registry = MaterialRegistry.getInstance();
         for (MaterialVariant material : context.getMaterials()) {
-            if (!material.getVariant().getId().equals(CompositePickHeadCastingRecipe.MATERIAL)) {
-                continue;
-            }
+            if (!material.getVariant().getId().equals(CompositePickHeadCastingRecipe.MATERIAL)) continue;
             AlloyComposition composition;
             try {
                 composition = AlloyVariantCodec.decode(material.getVariant().getVariant());
@@ -69,9 +65,7 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
             for (MaterialIngredient ingredient : composition.ingredients()) {
                 TraitAccess access = SilentTinkersConfig.traitThresholds()
                         .accessFor(100.0 * ingredient.units() / composition.totalUnits());
-                if (access == TraitAccess.NONE) {
-                    continue;
-                }
+                if (access == TraitAccess.NONE) continue;
                 resolveTinkersMaterial(registry, ingredient.materialId()).ifPresent(materialId -> {
                     List<ModifierEntry> traits = registry.getTraits(materialId, HeadMaterialStats.ID);
                     int allowed = switch (access) {
@@ -86,56 +80,38 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
         }
     }
 
-    private static Optional<MaterialId> resolveTinkersMaterial(IMaterialRegistry registry,
-                                                                ResourceLocation sourceId) {
+    private static Optional<MaterialId> resolveTinkersMaterial(IMaterialRegistry registry, ResourceLocation sourceId) {
         MaterialId exact = new MaterialId(sourceId);
-        if (registry.getMaterial(exact) != IMaterial.UNKNOWN) {
-            return Optional.of(exact);
-        }
+        if (registry.getMaterial(exact) != IMaterial.UNKNOWN) return Optional.of(exact);
 
         MaterialId tconstruct = new MaterialId("tconstruct", sourceId.getPath());
-        if (registry.getMaterial(tconstruct) != IMaterial.UNKNOWN) {
-            return Optional.of(tconstruct);
-        }
-
-        MaterialId tconstruct = new MaterialId("tconstruct", sourceId.getPath());
-        if (registry.getMaterial(tconstruct) != IMaterial.UNKNOWN) {
-            return Optional.of(tconstruct);
-        }
+        if (registry.getMaterial(tconstruct) != IMaterial.UNKNOWN) return Optional.of(tconstruct);
 
         List<MaterialId> samePath = registry.getAllMaterials().stream()
                 .map(IMaterial::getIdentifier)
                 .filter(id -> id.getPath().equals(sourceId.getPath()))
                 .distinct()
                 .toList();
-        if (samePath.size() == 1) {
-            return Optional.of(samePath.get(0));
-        }
-        return Optional.empty();
+        return samePath.size() == 1 ? Optional.of(samePath.get(0)) : Optional.empty();
     }
 
     @Override
     public void addToolStats(IToolContext context, ModifierEntry modifier, ModifierStatsBuilder builder) {
         boolean foundComposite = false;
         for (MaterialVariant material : context.getMaterials()) {
-            if (!material.getVariant().getId().equals(CompositePickHeadCastingRecipe.MATERIAL)) {
-                continue;
-            }
+            if (!material.getVariant().getId().equals(CompositePickHeadCastingRecipe.MATERIAL)) continue;
             foundComposite = true;
             Optional<AlloyStatSnapshot> decoded;
             try {
                 decoded = AlloyVariantCodec.decodeStats(material.getVariant().getVariant());
             } catch (IllegalArgumentException exception) {
-                SilentTinkersMod.LOGGER.warn("[SilentTinkers:COMPOSITE_STATS_DECODE_FAILED] variant={}",
-                        material.getVariant(), exception);
+                SilentTinkersMod.LOGGER.warn("[SilentTinkers:COMPOSITE_STATS_DECODE_FAILED] variant={}", material.getVariant(), exception);
                 continue;
             }
             if (decoded.isEmpty()) {
                 String variantKey = material.getVariant().toString();
                 if (LOGGED_MISSING_STAT_VARIANTS.add(variantKey)) {
-                    SilentTinkersMod.LOGGER.warn(
-                            "[SilentTinkers:COMPOSITE_STATS_MISSING] variant={} -- composite material reached tool construction without encoded stats",
-                            material.getVariant());
+                    SilentTinkersMod.LOGGER.warn("[SilentTinkers:COMPOSITE_STATS_MISSING] variant={} -- composite material reached tool construction without encoded stats", material.getVariant());
                 }
                 continue;
             }
@@ -144,10 +120,8 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
             RuntimeBridgeHealth.markCompositeStatsApplied();
             String variantKey = material.getVariant().toString();
             if (LOGGED_STAT_VARIANTS.add(variantKey)) {
-                SilentTinkersMod.LOGGER.info(
-                        "[SilentTinkers:COMPOSITE_STATS_APPLIED] variant={} durability={} miningSpeed={} meleeDamage={} attackSpeed={} tier={}",
-                        material.getVariant(), stats.durability(), stats.miningSpeed(), stats.meleeDamage(),
-                        stats.attackSpeed(), stats.harvestTier());
+                SilentTinkersMod.LOGGER.info("[SilentTinkers:COMPOSITE_STATS_APPLIED] variant={} durability={} miningSpeed={} meleeDamage={} attackSpeed={} tier={}",
+                        material.getVariant(), stats.durability(), stats.miningSpeed(), stats.meleeDamage(), stats.attackSpeed(), stats.harvestTier());
             }
         }
 
@@ -156,9 +130,7 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
                     .map(material -> material.getVariant().toString())
                     .collect(Collectors.joining(","));
             if (LOGGED_CONTEXTS_WITHOUT_COMPOSITE.add(materials)) {
-                SilentTinkersMod.LOGGER.warn(
-                        "[SilentTinkers:COMPOSITE_MODIFIER_WITHOUT_MATERIAL] materials=[{}] -- modifier ran but composite material variant is absent",
-                        materials);
+                SilentTinkersMod.LOGGER.warn("[SilentTinkers:COMPOSITE_MODIFIER_WITHOUT_MATERIAL] materials=[{}] -- modifier ran but composite material variant is absent", materials);
             }
         }
     }
@@ -173,8 +145,7 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
         if (tier != null) {
             ToolStats.HARVEST_TIER.update(builder, tier);
         } else if (LOGGED_UNKNOWN_TIERS.add(stats.harvestTier())) {
-            SilentTinkersMod.LOGGER.warn("[SilentTinkers:COMPOSITE_TIER_UNKNOWN] tier={} -- falling back to the tool's existing harvest tier",
-                    stats.harvestTier());
+            SilentTinkersMod.LOGGER.warn("[SilentTinkers:COMPOSITE_TIER_UNKNOWN] tier={} -- falling back to the tool's existing harvest tier", stats.harvestTier());
         }
     }
 }
