@@ -3,6 +3,7 @@ package com.anthonyahellman.silenttinkers;
 import com.anthonyahellman.silenttinkers.command.SilentTinkersCommands;
 import com.anthonyahellman.silenttinkers.config.SilentTinkersConfig;
 import com.anthonyahellman.silenttinkers.material.CompositeBridgeHealth;
+import com.anthonyahellman.silenttinkers.material.FtbQuestMaterialExporter;
 import com.anthonyahellman.silenttinkers.material.MaterialDiscoveryState;
 import com.anthonyahellman.silenttinkers.material.RuntimeBridgeHealth;
 import com.anthonyahellman.silenttinkers.material.StarChargeBridgeHealth;
@@ -57,8 +58,13 @@ public final class SilentTinkersMod {
 
         LOGGER.info("SilentTinkers material scan starting after datapack sync");
         try {
-            UnifiedMaterialDiscovery.discover();
+            UnifiedMaterialDiscovery.Snapshot snapshot = UnifiedMaterialDiscovery.discover();
             validateCompositeTraitBinding();
+            if (FtbQuestMaterialExporter.writeIfAvailable(snapshot)) {
+                var server = event.getPlayerList().getServer();
+                server.execute(() -> server.getCommands().performPrefixedCommand(
+                        server.createCommandSourceStack(), "ftbquests reload"));
+            }
         } catch (RuntimeException | LinkageError exception) {
             MaterialDiscoveryState.clear();
             CompositeBridgeHealth.clear();
