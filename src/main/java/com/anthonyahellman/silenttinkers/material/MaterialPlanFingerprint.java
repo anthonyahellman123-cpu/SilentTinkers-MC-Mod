@@ -8,8 +8,9 @@ import java.util.HexFormat;
 
 /**
  * Stable short fingerprint of a completed bridge plan. It is deliberately based
- * on logical evaluation identities rather than object hash codes, making it
- * useful in server logs when comparing restarts or modpack changes.
+ * on logical evaluation identities and resolved stats rather than object hash
+ * codes, making it useful in server logs when comparing restarts, configs, or
+ * modpack changes.
  */
 public final class MaterialPlanFingerprint {
     private static final int DISPLAY_HEX_LENGTH = 16;
@@ -41,6 +42,9 @@ public final class MaterialPlanFingerprint {
                 + "|" + request.source().map(Enum::name).orElse("NONE")
                 + "|" + request.sourceMaterialId().map(Object::toString).orElse("NONE")
                 + "|" + request.target().map(Enum::name).orElse("BOTH")
-                + "|" + evaluation.status();
+                + "|" + request.bootstrapProfile().map(Object::toString).orElse("NONE")
+                + "|" + evaluation.status()
+                + "|translated=" + evaluation.translatedStats().map(Object::toString).orElse("NONE")
+                + "|tinkers=" + evaluation.tinkersSourceStats().map(Object::toString).orElse("NONE");
     }
 }
