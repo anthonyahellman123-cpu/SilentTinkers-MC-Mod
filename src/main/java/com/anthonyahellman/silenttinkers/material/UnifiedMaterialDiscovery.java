@@ -130,7 +130,7 @@ public final class UnifiedMaterialDiscovery {
                                           String planFingerprint) {
         int quarantined = requestQuarantined + aliasQuarantined;
         SilentTinkersMod.LOGGER.info(
-                "[SilentTinkers:STARTUP_SUMMARY] plan={} SG={} TCon={} preserved={} bridgeToTinkers={} runtimeReady={} deferredPhysicalForm={} tinkersSourceReady={} bootstrapPending={} quarantined={} status=READY",
+                "[SilentTinkers:STARTUP_SUMMARY] plan={} SG={} TCon={} preserved={} bridgeToTinkers={} runtimeReady={} deferredPhysicalForm={} tinkersSourceReady={} bootstrapPending={} quarantined={} status=SCAN_READY",
                 planFingerprint, silentGear.materials(), tinkers.materials(), preserved, readyForTinkers, runtimeReady,
                 deferredPhysicalForm, tinkersSourceReady, bootstrapPending, quarantined);
     }
