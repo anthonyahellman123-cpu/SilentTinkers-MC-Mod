@@ -30,48 +30,45 @@ public final class AlloyVariantCodec {
                     .append('_')
                     .append(Long.toString(ingredient.units(), 36));
         }
-        if (encoded.length() > MAX_ENCODED_LENGTH) {
-            throw new IllegalArgumentException("Encoded alloy exceeds " + MAX_ENCODED_LENGTH + " characters");
-        }
-        return encoded.toString();
+        return checked(encoded.toString());
     }
 
     public static String encode(AlloyComposition composition, int starChargeLevel) {
         String encoded = encode(composition);
-        if (starChargeLevel <= 0) {
-            return encoded;
+        if (starChargeLevel > 0) {
+            encoded += ".s" + Integer.toString(starChargeLevel, 36);
         }
-        String charged = encoded + ".s" + Integer.toString(starChargeLevel, 36);
-        if (charged.length() > MAX_ENCODED_LENGTH) {
-            throw new IllegalArgumentException("Encoded alloy exceeds " + MAX_ENCODED_LENGTH + " characters");
-        }
-        return charged;
+        return checked(encoded);
     }
 
     public static String encode(AlloyComposition composition, int starChargeLevel,
                                 Optional<AlloyStatSnapshot> stats) {
+        return encode(composition, starChargeLevel, stats, Optional.empty());
+    }
+
+    public static String encode(AlloyComposition composition, int starChargeLevel,
+                                Optional<AlloyStatSnapshot> stats,
+                                Optional<SourceVisualIdentity> visualSource) {
         String encoded = encode(composition, starChargeLevel);
-        if (stats.isEmpty()) {
-            return encoded;
+        if (visualSource.isPresent()) {
+            encoded += ".v" + HexFormat.of().formatHex(
+                    visualSource.get().itemId().toString().getBytes(StandardCharsets.UTF_8));
         }
-        AlloyStatSnapshot value = stats.get();
-        String statData = ".d"
-                + encodeFloat(value.durability()) + '_'
-                + encodeFloat(value.miningSpeed()) + '_'
-                + encodeFloat(value.meleeDamage()) + '_'
-                + encodeFloat(value.attackSpeed()) + '_'
-                + HexFormat.of().formatHex(value.harvestTier().toString().getBytes(StandardCharsets.UTF_8));
-        if (encoded.length() + statData.length() > MAX_ENCODED_LENGTH) {
-            throw new IllegalArgumentException("Encoded alloy exceeds " + MAX_ENCODED_LENGTH + " characters");
+        if (stats.isPresent()) {
+            AlloyStatSnapshot value = stats.get();
+            encoded += ".d"
+                    + encodeFloat(value.durability()) + '_'
+                    + encodeFloat(value.miningSpeed()) + '_'
+                    + encodeFloat(value.meleeDamage()) + '_'
+                    + encodeFloat(value.attackSpeed()) + '_'
+                    + HexFormat.of().formatHex(value.harvestTier().toString().getBytes(StandardCharsets.UTF_8));
         }
-        return encoded + statData;
+        return checked(encoded);
     }
 
     public static AlloyComposition decode(String encoded) {
-        if (!encoded.startsWith(PREFIX) || encoded.length() > MAX_ENCODED_LENGTH) {
-            throw new IllegalArgumentException("Unsupported alloy variant");
-        }
-        String compositionData = stripChargeSuffix(encoded);
+        validate(encoded);
+        String compositionData = stripMetadataSuffix(encoded);
         Map<ResourceLocation, Long> ingredients = new LinkedHashMap<>();
         for (String entry : compositionData.substring(PREFIX.length()).split("-")) {
             int separator = entry.lastIndexOf('_');
@@ -100,35 +97,43 @@ public final class AlloyVariantCodec {
     }
 
     public static int decodeStarChargeLevel(String encoded) {
-        if (!encoded.startsWith(PREFIX) || encoded.length() > MAX_ENCODED_LENGTH) {
-            throw new IllegalArgumentException("Unsupported alloy variant");
-        }
-        int marker = encoded.lastIndexOf(".s");
-        if (marker < 0) {
-            return 0;
-        }
-        int end = encoded.indexOf('.', marker + 2);
+        validate(encoded);
+        int marker = encoded.indexOf(".s", PREFIX.length());
+        if (marker < 0) return 0;
+        int end = nextMetadataMarker(encoded, marker + 2);
         String levelText = encoded.substring(marker + 2, end < 0 ? encoded.length() : end);
         try {
             int level = Integer.parseInt(levelText, 36);
-            if (level <= 0) {
-                throw new IllegalArgumentException("Invalid starcharge level");
-            }
+            if (level <= 0) throw new IllegalArgumentException("Invalid starcharge level");
             return level;
         } catch (NumberFormatException exception) {
             throw new IllegalArgumentException("Invalid starcharge level", exception);
         }
     }
 
+    public static Optional<ResourceLocation> decodeVisualSourceItemId(String encoded) {
+        validate(encoded);
+        int marker = encoded.indexOf(".v", PREFIX.length());
+        if (marker < 0) return Optional.empty();
+        int end = nextMetadataMarker(encoded, marker + 2);
+        String encodedItem = encoded.substring(marker + 2, end < 0 ? encoded.length() : end);
+        try {
+            ResourceLocation itemId = ResourceLocation.tryParse(new String(
+                    HexFormat.of().parseHex(encodedItem), StandardCharsets.UTF_8));
+            if (itemId == null) throw new IllegalArgumentException("Invalid visual source item ID");
+            return Optional.of(itemId);
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("Malformed visual source item ID", exception);
+        }
+    }
+
     public static Optional<AlloyStatSnapshot> decodeStats(String encoded) {
-        if (!encoded.startsWith(PREFIX) || encoded.length() > MAX_ENCODED_LENGTH) {
-            throw new IllegalArgumentException("Unsupported alloy variant");
-        }
-        int marker = encoded.lastIndexOf(".d");
-        if (marker < 0) {
-            return Optional.empty();
-        }
-        String[] fields = encoded.substring(marker + 2).split("_", -1);
+        validate(encoded);
+        int marker = encoded.indexOf(".d", PREFIX.length());
+        if (marker < 0) return Optional.empty();
+        int end = nextMetadataMarker(encoded, marker + 2);
+        String statData = encoded.substring(marker + 2, end < 0 ? encoded.length() : end);
+        String[] fields = statData.split("_", -1);
         if (fields.length != 5) {
             throw new IllegalArgumentException("Malformed alloy stat snapshot");
         }
@@ -146,18 +151,31 @@ public final class AlloyVariantCodec {
         }
     }
 
-    private static String stripChargeSuffix(String encoded) {
-        int charge = encoded.indexOf(".s", PREFIX.length());
-        int stats = encoded.indexOf(".d", PREFIX.length());
-        int marker;
-        if (charge < 0) {
-            marker = stats;
-        } else if (stats < 0) {
-            marker = charge;
-        } else {
-            marker = Math.min(charge, stats);
-        }
+    private static String stripMetadataSuffix(String encoded) {
+        int marker = nextMetadataMarker(encoded, PREFIX.length());
         return marker < 0 ? encoded : encoded.substring(0, marker);
+    }
+
+    private static int nextMetadataMarker(String encoded, int fromIndex) {
+        int next = -1;
+        for (String marker : new String[]{".s", ".v", ".d"}) {
+            int candidate = encoded.indexOf(marker, fromIndex);
+            if (candidate >= 0 && (next < 0 || candidate < next)) next = candidate;
+        }
+        return next;
+    }
+
+    private static String checked(String encoded) {
+        if (encoded.length() > MAX_ENCODED_LENGTH) {
+            throw new IllegalArgumentException("Encoded alloy exceeds " + MAX_ENCODED_LENGTH + " characters");
+        }
+        return encoded;
+    }
+
+    private static void validate(String encoded) {
+        if (!encoded.startsWith(PREFIX) || encoded.length() > MAX_ENCODED_LENGTH) {
+            throw new IllegalArgumentException("Unsupported alloy variant");
+        }
     }
 
     private static String encodeFloat(float value) {
