@@ -3,6 +3,7 @@ package com.anthonyahellman.silenttinkers;
 import com.anthonyahellman.silenttinkers.config.SilentTinkersConfig;
 import com.anthonyahellman.silenttinkers.material.AlloyPayload;
 import com.anthonyahellman.silenttinkers.material.AlloyStatSnapshot;
+import com.anthonyahellman.silenttinkers.material.AlloyVariantCodec;
 import com.anthonyahellman.silenttinkers.material.MaterialDiscoveryState;
 import com.anthonyahellman.silenttinkers.material.MaterialIngredient;
 import com.anthonyahellman.silenttinkers.material.UnifiedMaterialDiscovery;
@@ -27,9 +28,13 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.slf4j.Logger;
 import slimeknights.tconstruct.library.materials.MaterialRegistry;
+import slimeknights.tconstruct.library.materials.definition.MaterialVariant;
 import slimeknights.tconstruct.library.modifiers.ModifierEntry;
 import slimeknights.tconstruct.library.modifiers.ModifierHooks;
 import slimeknights.tconstruct.library.modifiers.hook.build.ToolStatsModifierHook;
+import slimeknights.tconstruct.library.tools.item.IModifiable;
+import slimeknights.tconstruct.library.tools.nbt.ToolStack;
+import slimeknights.tconstruct.library.tools.stat.ToolStats;
 import slimeknights.tconstruct.tools.TinkerToolParts;
 import slimeknights.tconstruct.tools.stats.HeadMaterialStats;
 
@@ -65,19 +70,11 @@ public final class SilentTinkersMod {
             UnifiedMaterialDiscovery.discover();
             validateCompositeTraitBinding();
         } catch (RuntimeException | LinkageError exception) {
-            // A bad addon/material must never make player login or a dedicated
-            // server datapack sync fail. Drop the snapshot so the bridge cannot
-            // act on stale or partial data; later syncs may safely retry.
             MaterialDiscoveryState.clear();
             LOGGER.error("[SilentTinkers:SCAN_FAILED] Material discovery failed; automatic bridging disabled until a later successful scan", exception);
         }
     }
 
-    /**
-     * Confirms the static composite material actually grants our modifier for
-     * head-stat tools. Dynamic variants inherit traits from the base material ID,
-     * so this is the earliest useful checkpoint for the final tool handoff.
-     */
     private static void validateCompositeTraitBinding() {
         List<ModifierEntry> traits = MaterialRegistry.getInstance()
                 .getTraits(CompositePickHeadCastingRecipe.MATERIAL, HeadMaterialStats.ID);
@@ -107,18 +104,18 @@ public final class SilentTinkersMod {
         }
     }
 
-    /**
-     * Tinkers' normal tool-part tooltip reports the static placeholder material
-     * stats. Dynamic composite parts carry their real stats in our payload, so
-     * expose those directly on the cast pick head to avoid a misleading
-     * "wood/1 durability" diagnostic while the part is still unassembled.
-     */
     private void onItemTooltip(ItemTooltipEvent event) {
         ItemStack stack = event.getItemStack();
-        if (!stack.is(TinkerToolParts.pickHead.get())) {
+        if (stack.is(TinkerToolParts.pickHead.get())) {
+            appendCompositePartTooltip(event, stack);
             return;
         }
+        if (stack.getItem() instanceof IModifiable) {
+            appendCompositeToolTooltip(event, stack);
+        }
+    }
 
+    private static void appendCompositePartTooltip(ItemTooltipEvent event, ItemStack stack) {
         AlloyPayload.read(stack).ifPresent(composition -> {
             event.getToolTip().add(Component.literal("SilentTinkers dynamic payload")
                     .withStyle(ChatFormatting.GOLD));
@@ -129,6 +126,57 @@ public final class SilentTinkersMod {
             }
             AlloyPayload.readStats(stack).ifPresent(stats -> appendDynamicStats(event, stats));
         });
+    }
+
+    /**
+     * Development-facing end-to-end checkpoint. If a finished Tinkers tool
+     * contains our composite material, show whether the encoded variant survived,
+     * whether the composite trait was actually copied onto the tool, and the
+     * final stats Tinkers stored after its rebuild pipeline.
+     */
+    private static void appendCompositeToolTooltip(ItemTooltipEvent event, ItemStack stack) {
+        ToolStack tool = ToolStack.from(stack);
+        MaterialVariant composite = null;
+        for (MaterialVariant material : tool.getMaterials()) {
+            if (material.getVariant().getId().equals(CompositePickHeadCastingRecipe.MATERIAL)) {
+                composite = material;
+                break;
+            }
+        }
+        if (composite == null) {
+            return;
+        }
+
+        event.getToolTip().add(Component.literal("SilentTinkers assembled-tool diagnostic")
+                .withStyle(ChatFormatting.GOLD));
+
+        boolean modifierPresent = tool.getModifiers().getModifiers().stream()
+                .anyMatch(entry -> entry.getId().toString().equals(MOD_ID + ":composite_alloy"));
+        event.getToolTip().add(Component.literal("Composite modifier: " + (modifierPresent ? "BOUND" : "MISSING"))
+                .withStyle(modifierPresent ? ChatFormatting.GREEN : ChatFormatting.RED));
+
+        String variant = composite.getVariant().getVariant();
+        try {
+            AlloyVariantCodec.decodeStats(variant).ifPresentOrElse(
+                    stats -> event.getToolTip().add(Component.literal("Variant stats: PRESENT")
+                            .withStyle(ChatFormatting.GREEN)),
+                    () -> event.getToolTip().add(Component.literal("Variant stats: MISSING")
+                            .withStyle(ChatFormatting.RED)));
+        } catch (IllegalArgumentException exception) {
+            event.getToolTip().add(Component.literal("Variant stats: INVALID")
+                    .withStyle(ChatFormatting.RED));
+        }
+
+        event.getToolTip().add(Component.literal("Final durability: " + tool.getStats().get(ToolStats.DURABILITY))
+                .withStyle(ChatFormatting.GRAY));
+        event.getToolTip().add(Component.literal("Final mining speed: " + tool.getStats().get(ToolStats.MINING_SPEED))
+                .withStyle(ChatFormatting.GRAY));
+        event.getToolTip().add(Component.literal("Final melee damage: " + tool.getStats().get(ToolStats.ATTACK_DAMAGE))
+                .withStyle(ChatFormatting.GRAY));
+        event.getToolTip().add(Component.literal("Final attack speed: " + tool.getStats().get(ToolStats.ATTACK_SPEED))
+                .withStyle(ChatFormatting.GRAY));
+        event.getToolTip().add(Component.literal("Final harvest tier: " + tool.getStats().get(ToolStats.HARVEST_TIER))
+                .withStyle(ChatFormatting.GRAY));
     }
 
     private static void appendDynamicStats(ItemTooltipEvent event, AlloyStatSnapshot stats) {
