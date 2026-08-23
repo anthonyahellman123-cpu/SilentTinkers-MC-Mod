@@ -245,7 +245,8 @@ public final class FtbQuestMaterialExporter {
                                                      MaterialProfile.Ecosystem ecosystem) {
             if (ecosystem == MaterialProfile.Ecosystem.TINKERS_CONSTRUCT && MaterialRegistry.isFullyLoaded()) {
                 return MaterialRegistry.getInstance().getTraits(new MaterialId(material), HeadMaterialStats.ID).stream()
-                        .map(entry -> entry.getId().getId()).distinct().toList();
+                        .map(entry -> ResourceLocation.tryParse(entry.getId().toString()))
+                        .filter(java.util.Objects::nonNull).distinct().toList();
             }
             return snapshot.index().get(item)
                     .map(MaterialCorrelationIndex.Candidate::profiles)
