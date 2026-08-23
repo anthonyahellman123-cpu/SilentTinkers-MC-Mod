@@ -3,6 +3,7 @@ package com.anthonyahellman.silenttinkers.material;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Collection;
 import java.util.HexFormat;
 
 /**
@@ -16,9 +17,13 @@ public final class MaterialPlanFingerprint {
     private MaterialPlanFingerprint() {}
 
     public static String of(UnifiedMaterialDiscovery.Snapshot snapshot) {
+        return ofEvaluations(snapshot.evaluations());
+    }
+
+    static String ofEvaluations(Collection<MaterialGenerationEvaluation> evaluations) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            snapshot.evaluations().stream()
+            evaluations.stream()
                     .map(MaterialPlanFingerprint::canonicalLine)
                     .sorted()
                     .forEach(line -> digest.update((line + "\n").getBytes(StandardCharsets.UTF_8)));
