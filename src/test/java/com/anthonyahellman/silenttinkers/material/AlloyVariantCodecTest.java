@@ -1,5 +1,6 @@
 package com.anthonyahellman.silenttinkers.material;
 
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Test;
@@ -120,5 +121,34 @@ final class AlloyVariantCodecTest {
                 AlloyVariantCodec.decodeVisualSourceItemId(restoredVariant).orElseThrow());
         assertEquals(stats, AlloyVariantCodec.decodeStats(restoredVariant).orElseThrow());
         assertEquals(composition.fingerprint(), AlloyVariantCodec.decode(restoredVariant).fingerprint());
+    }
+
+    @Test
+    void dynamicSourceVisualTagSurvivesFinishedToolMaterialPersistence() {
+        AlloyComposition composition = AlloyComposition.of(Map.of(
+                new ResourceLocation("silentgear", "alloy_ingot"), 1L));
+        AlloyStatSnapshot stats = new AlloyStatSnapshot(
+                1337.0f, 9.5f, 4.25f, 0.1f,
+                new ResourceLocation("minecraft", "netherite"));
+        CompoundTag dynamicTag = new CompoundTag();
+        dynamicTag.putString("VisualFingerprint", "ratio:3-1-elementium-manasteel");
+        dynamicTag.putInt("ColorSeed", 42);
+        SourceVisualIdentity visualSource = new SourceVisualIdentity(
+                new ResourceLocation("silentgear", "alloy_ingot"), Optional.of(dynamicTag));
+
+        MaterialVariantId variant = MaterialVariantId.create(
+                new MaterialId("silenttinkers", "composite_alloy"),
+                AlloyVariantCodec.encode(composition, 2, Optional.of(stats), Optional.of(visualSource)));
+        MaterialNBT restored = MaterialNBT.readFromNBT(
+                MaterialNBT.of(MaterialVariant.of(variant)).serializeToNBT());
+        String restoredVariant = restored.get(0).getVariant().getVariant();
+        SourceVisualIdentity restoredVisual = AlloyVariantCodec.decodeVisualSource(restoredVariant).orElseThrow();
+
+        assertEquals(visualSource.itemId(), restoredVisual.itemId());
+        assertEquals("ratio:3-1-elementium-manasteel",
+                restoredVisual.itemTag().orElseThrow().getString("VisualFingerprint"));
+        assertEquals(42, restoredVisual.itemTag().orElseThrow().getInt("ColorSeed"));
+        assertEquals(2, AlloyVariantCodec.decodeStarChargeLevel(restoredVariant));
+        assertEquals(stats, AlloyVariantCodec.decodeStats(restoredVariant).orElseThrow());
     }
 }
