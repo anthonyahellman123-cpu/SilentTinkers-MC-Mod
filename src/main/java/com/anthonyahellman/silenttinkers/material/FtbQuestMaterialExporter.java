@@ -142,8 +142,8 @@ public final class FtbQuestMaterialExporter {
             out.append("\t\t{\n")
                     .append("\t\t\tdependencies: [\"").append(GUIDE_UNLOCK_ID).append("\"]\n")
                     .append("\t\t\tdescription: [\n")
-                    .append("\t\t\t\t\"Physical item: ").append(escape(entry.item().toString())).append("\"\n")
-                    .append("\t\t\t\t\"Material: ").append(escape(entry.material().toString())).append("\"\n");
+                    .append("\t\t\t\t\"Item: ").append(escape(humanize(entry.item().getPath()))).append("\"\n")
+                    .append("\t\t\t\t\"Material: ").append(escape(humanize(entry.material().getPath()))).append("\"\n");
             entry.descriptionLines().forEach(line -> out.append("\t\t\t\t\"")
                     .append(escape(line)).append("\"\n"));
             out.append("\t\t\t]\n")
@@ -221,7 +221,7 @@ public final class FtbQuestMaterialExporter {
                         + ", mining speed " + number(stats.miningSpeed())
                         + ", melee damage " + number(stats.meleeDamage())
                         + ", attack speed " + signed(stats.attackSpeed()));
-                lines.add("Harvest tier: " + stats.harvestTier());
+                lines.add("Harvest tier: " + humanize(stats.harvestTier().getPath()));
             });
             evaluation.tinkersSourceStats().ifPresent(stats -> {
                 lines.add("Head stats - durability " + stats.headDurability()
@@ -231,11 +231,11 @@ public final class FtbQuestMaterialExporter {
                         + ", mining speed " + percent(stats.handleMiningSpeedModifier())
                         + ", attack speed " + percent(stats.handleAttackSpeedModifier())
                         + ", damage " + percent(stats.handleDamageModifier()));
-                lines.add("Harvest tier: " + stats.harvestTier());
+                lines.add("Harvest tier: " + humanize(stats.harvestTier().getPath()));
             });
             List<ResourceLocation> traits = traits(snapshot, request.physicalItem(), material, ecosystem);
             lines.add(traits.isEmpty() ? "Base head traits: none reported"
-                    : "Base head traits: " + traits.stream().map(ResourceLocation::toString)
+                    : "Base head traits: " + traits.stream().map(ResourceLocation::getPath).map(FtbQuestMaterialExporter::humanize)
                     .collect(Collectors.joining(", ")));
             lines.add(ecosystem == MaterialProfile.Ecosystem.TINKERS_CONSTRUCT
                     ? "Native Tinkers material; values shown are its currently loaded base stats."
