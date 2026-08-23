@@ -6,7 +6,7 @@ import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.loading.FMLPaths;
 import slimeknights.tconstruct.library.materials.MaterialRegistry;
 import slimeknights.tconstruct.library.materials.definition.MaterialId;
-import slimeknights.tconstruct.library.materials.stats.HeadMaterialStats;
+import slimeknights.tconstruct.tools.stats.HeadMaterialStats;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
