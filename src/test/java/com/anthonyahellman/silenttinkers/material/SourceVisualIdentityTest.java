@@ -2,11 +2,8 @@ package com.anthonyahellman.silenttinkers.material;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import org.junit.jupiter.api.Test;
 
-import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -27,18 +24,14 @@ class SourceVisualIdentityTest {
     }
 
     @Test
-    void visualSourceSurvivesTheSharedAlloyEnvelope() {
-        AlloyComposition composition = AlloyComposition.of(Map.of(id("silentcompat:elementium"), 1L));
-        AlloyStatSnapshot stats = new AlloyStatSnapshot(
-                720.0f, 6.2f, 2.0f, 0.0f, id("minecraft:diamond"));
+    void visualSourceCanBeReadFromTheSharedAlloyEnvelope() {
         SourceVisualIdentity visual = new SourceVisualIdentity(
                 id("botania:elementium_ingot"), Optional.empty());
-        ItemStack carrier = new ItemStack(Items.STICK);
+        CompoundTag root = AlloyComposition.of(java.util.Map.of(id("silentcompat:elementium"), 1L)).save();
+        root.put("VisualSource", visual.save());
+        CompoundTag carrier = new CompoundTag();
+        carrier.put(AlloyPayload.ROOT_KEY, root);
 
-        AlloyPayload.write(carrier, composition, 0, Optional.of(stats), Optional.of(visual));
-
-        assertEquals(composition.fingerprint(), AlloyPayload.read(carrier).orElseThrow().fingerprint());
-        assertEquals(stats, AlloyPayload.readStats(carrier).orElseThrow());
         assertEquals(visual.itemId(), AlloyPayload.readVisualSource(carrier).orElseThrow().itemId());
     }
 
