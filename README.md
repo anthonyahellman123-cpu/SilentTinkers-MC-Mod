@@ -14,8 +14,8 @@ identity into Tinkers' Construct's multipart tool system.
 ## Design rule
 
 The processed ingot is the source of truth. Its material composition, grade,
-statistics, and traits must survive conversion into a Tinkers part and remain
-available after normal Tinkers assembly and modification.
+statistics, traits, and eventually its visible identity should survive conversion
+into a Tinkers part instead of being re-authored as a separate fake material.
 
 ## First vertical slice
 
@@ -26,6 +26,7 @@ available after normal Tinkers assembly and modification.
 5. Apply Silent Gear's evaluated stats to a completed Tinkers tool. **Validated in game**
 6. Preserve normal Tinkers multipart stat math around the dynamic head. **Validated in game**
 7. Forward thresholded native Tinkers/addon traits. **Implemented; broader in-game validation pending**
+8. Preserve the original source item's visual identity metadata across conversion. **Implemented; renderer pending**
 
 Equivalent ratios share the same compact fingerprint. Runtime-created alloys do
 not register new fluids or materials globally; one carrier fluid holds a bounded
@@ -50,6 +51,30 @@ composition payload instead.
 - For ingredients that also exist in Tinkers or an installed Tinkers addon, the
   modifier asks Tinkers' live material registry for the real head traits. The
   addon that owns a trait therefore remains responsible for its implementation.
+
+## Visual identity relay
+
+SilentTinkers now records what the material actually was before conversion rather
+than assigning a replacement color by material name. `SourceVisualIdentity`
+captures the source item registry ID and, when reasonably sized, a defensive copy
+of the source stack tag. That matters for dynamic Silent Gear alloys whose NBT may
+influence how the original item is presented.
+
+The source identity currently follows this path:
+
+`source item` → `molten composite payload` → `diagnostic sample / cast part`.
+
+The source item ID is also encoded into the synthetic Tinkers material variant,
+so normal Tinkers assembly carries that origin into the finished tool even though
+Tinkers does not copy arbitrary part NBT into its tool NBT. Development tooltips
+show the recovered visual source ID so this boundary can be tested independently
+before rendering is changed.
+
+The renderer itself is intentionally a later step. It should ask the original
+source item's client rendering data what it looked like and project that visual
+identity onto the composite fluid/part frame. SilentTinkers should not maintain a
+hard-coded table such as `elementium = pink`; the source ecosystem remains the
+authority for both behavior and appearance.
 
 ## Validated Elementium path
 
@@ -83,8 +108,10 @@ server-side stat hook and the finished client tool.
 2. Use a discovered one-unit Silent Gear material form such as a supported
    ingot/gem/crystal, or a normal Silent Gear compound alloy ingot.
 3. Melt the supported material in a Tinkers smeltery or melter.
-4. Pour into the diagnostic sample or a reusable pick-head cast.
-5. Assemble the resulting composite pick head into a normal Tinkers pickaxe.
+4. Pour into the diagnostic sample or a reusable pick-head cast. New casts should
+   show `Visual source: <original item id>` in the development tooltip.
+5. Assemble the resulting composite pick head into a normal Tinkers pickaxe. New
+   variants also carry the source item ID into the finished-tool diagnostic.
 6. `/silenttinkers status` reports scan health, bridge counts, composite hook
    binding, and whether dynamic assembled-tool stats have actually executed in
    the current server session.
