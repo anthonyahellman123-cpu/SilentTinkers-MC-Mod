@@ -25,6 +25,8 @@ import java.util.stream.Collectors;
 
 /** Generates FTB Quests material circles from the authoritative runtime scan. */
 public final class FtbQuestMaterialExporter {
+    private static final double MATERIAL_SPACING = 1.25;
+    private static final double MATERIAL_SIZE = 0.75;
     private static final String GUIDE_UNLOCK_ID = "51A17E17A5C0DE02";
     private static final String CORE_CHAPTER_ID = "51A17E17A5C0DE20";
     private static final String ADDON_CHAPTER_ID = "51A17E17A5C0DE30";
@@ -74,7 +76,7 @@ public final class FtbQuestMaterialExporter {
         String icon = materials.isEmpty() ? "minecraft:iron_ingot" : materials.get(0).item().toString();
         StringBuilder out = chapterStart("silenttinkers_available_materials", CORE_CHAPTER_ID,
                 icon, "Available Materials", 1);
-        appendMaterialGrid(out, materials, 0.0, 0.0, 8);
+        appendMaterialGrid(out, materials, -7.0, 0.0, 12);
         return chapterEnd(out);
     }
 
@@ -96,11 +98,11 @@ public final class FtbQuestMaterialExporter {
                     .append("\t\t\tshape: \"gear\"\n")
                     .append("\t\t\tsize: 1.5d\n")
                     .append("\t\t\ttitle: \"").append(escape(humanize(group.getKey()))).append("\"\n")
-                    .append("\t\t\tx: -5.0d\n")
+                    .append("\t\t\tx: -8.5d\n")
                     .append("\t\t\ty: ").append(decimal(y)).append("d\n")
                     .append("\t\t}\n");
-            appendMaterialGrid(out, entries, 1.0, y, 7);
-            y += Math.max(3.0, Math.ceil(entries.size() / 7.0) * 2.0 + 1.0);
+            appendMaterialGrid(out, entries, -7.0, y, 12);
+            y += Math.max(2.25, Math.ceil(entries.size() / 12.0) * MATERIAL_SPACING + 1.25);
         }
         return chapterEnd(out);
     }
@@ -135,8 +137,8 @@ public final class FtbQuestMaterialExporter {
                                            double startX, double startY, int columns) {
         for (int index = 0; index < materials.size(); index++) {
             Entry entry = materials.get(index);
-            double x = startX + (index % columns) * 2.0;
-            double y = startY + (index / columns) * 2.0;
+            double x = startX + (index % columns) * MATERIAL_SPACING;
+            double y = startY + (index / columns) * MATERIAL_SPACING;
             out.append("\t\t{\n")
                     .append("\t\t\tdependencies: [\"").append(GUIDE_UNLOCK_ID).append("\"]\n")
                     .append("\t\t\tdescription: [\n")
@@ -148,6 +150,7 @@ public final class FtbQuestMaterialExporter {
                     .append("\t\t\thide_until_deps_complete: true\n")
                     .append("\t\t\ticon: \"").append(entry.item()).append("\"\n")
                     .append("\t\t\tid: \"").append(id("material:" + entry.item())).append("\"\n")
+                    .append("\t\t\tsize: ").append(decimal(MATERIAL_SIZE)).append("d\n")
                     .append("\t\t\ttitle: \"").append(escape(humanize(entry.item().getPath()))).append("\"\n")
                     .append("\t\t\tx: ").append(decimal(x)).append("d\n")
                     .append("\t\t\ty: ").append(decimal(y)).append("d\n")
