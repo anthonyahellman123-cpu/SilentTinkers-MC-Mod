@@ -1,5 +1,6 @@
 package com.anthonyahellman.silenttinkers.command;
 
+import com.anthonyahellman.silenttinkers.material.CompositeBridgeHealth;
 import com.anthonyahellman.silenttinkers.material.MaterialDiscoveryState;
 import com.anthonyahellman.silenttinkers.material.MaterialGenerationEvaluation;
 import com.anthonyahellman.silenttinkers.material.MaterialPlanFingerprint;
@@ -63,7 +64,8 @@ public final class SilentTinkersCommands {
         source.sendSuccess(() -> Component.literal(
                 "TCon→SG ready " + tinkersSourceReady
                         + " | bootstrap pending " + bootstrapPending
-                        + " | quarantined " + quarantined), false);
+                        + " | quarantined " + quarantined
+                        + " | composite hook " + CompositeBridgeHealth.status()), false);
         return 1;
     }
 
