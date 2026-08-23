@@ -4,6 +4,7 @@ import com.anthonyahellman.silenttinkers.SilentTinkersMod;
 import com.anthonyahellman.silenttinkers.material.AlloyPayload;
 import com.anthonyahellman.silenttinkers.material.AlloyStatSnapshot;
 import com.anthonyahellman.silenttinkers.material.AlloyVariantCodec;
+import com.anthonyahellman.silenttinkers.material.SourceVisualIdentity;
 import com.anthonyahellman.silenttinkers.registry.ModFluids;
 import com.anthonyahellman.silenttinkers.registry.ModRecipes;
 import net.minecraft.core.RegistryAccess;
@@ -60,6 +61,7 @@ public final class CompositePickHeadCastingRecipe extends AbstractCastingRecipe 
         return AlloyPayload.read(inventory.getFluidTag()).map(composition -> {
             int starChargeLevel = AlloyPayload.readStarChargeLevel(inventory.getFluidTag());
             Optional<AlloyStatSnapshot> sourceStats = AlloyPayload.readStats(inventory.getFluidTag());
+            Optional<SourceVisualIdentity> visualSource = AlloyPayload.readVisualSource(inventory.getFluidTag());
             String encoded = AlloyVariantCodec.encode(composition, starChargeLevel, sourceStats);
             MaterialVariantId variant = MaterialVariantId.create(MATERIAL, encoded);
 
@@ -69,7 +71,7 @@ public final class CompositePickHeadCastingRecipe extends AbstractCastingRecipe 
             // variant here removes validation as a place where our payload could
             // be silently collapsed back to the plain composite material.
             ItemStack part = TinkerToolParts.pickHead.get().withMaterialForDisplay(variant);
-            AlloyPayload.write(part, composition, starChargeLevel, sourceStats);
+            AlloyPayload.write(part, composition, starChargeLevel, sourceStats, visualSource);
 
             MaterialVariantId stored = IMaterialItem.getMaterialFromStack(part);
             if (!variant.equals(stored)) {
@@ -94,8 +96,9 @@ public final class CompositePickHeadCastingRecipe extends AbstractCastingRecipe 
                             stored, compositionMatches, statsMatch, sourceStats.isPresent(), storedVariantStats.isPresent());
                 } else {
                     SilentTinkersMod.LOGGER.info(
-                            "[SilentTinkers:CAST_VARIANT_STORED] material={} composition={} statsPresent={} variantPayloadVerified=true",
-                            stored, composition.fingerprint(), sourceStats.isPresent());
+                            "[SilentTinkers:CAST_VARIANT_STORED] material={} composition={} statsPresent={} visualSource={} variantPayloadVerified=true",
+                            stored, composition.fingerprint(), sourceStats.isPresent(),
+                            visualSource.map(value -> value.itemId().toString()).orElse("NONE"));
                 }
             } catch (IllegalArgumentException exception) {
                 SilentTinkersMod.LOGGER.error(
