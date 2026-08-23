@@ -24,6 +24,7 @@ import slimeknights.tconstruct.tools.TinkerToolParts;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /** Client-only development diagnostics for synthetic composite parts and tools. */
 @Mod.EventBusSubscriber(modid = SilentTinkersMod.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
@@ -44,8 +45,9 @@ public final class CompositeTooltipEvents {
 
     private static void appendCompositePartTooltip(ItemTooltipEvent event, ItemStack stack) {
         AlloyPayload.read(stack).ifPresent(composition -> {
+            applyCompositionLabels(event, composition);
             appendPlayerSummary(event, AlloyPayload.readVisualSource(stack),
-                    AlloyPayload.readStarChargeLevel(stack), composition.ingredients().size());
+                    AlloyPayload.readStarChargeLevel(stack), composition);
             if (!event.getFlags().isAdvanced()) return;
 
             event.getToolTip().add(Component.literal("SilentTinkers diagnostics").withStyle(ChatFormatting.DARK_GRAY));
@@ -85,9 +87,11 @@ public final class CompositeTooltipEvents {
 
         String variant = composite.getVariant().getVariant();
         try {
+            var composition = AlloyVariantCodec.decode(variant);
+            applyCompositionLabels(event, composition);
             appendPlayerSummary(event, AlloyVariantCodec.decodeVisualSource(variant),
                     AlloyVariantCodec.decodeStarChargeLevel(variant),
-                    AlloyVariantCodec.decode(variant).ingredients().size());
+                    composition);
         } catch (IllegalArgumentException exception) {
             event.getToolTip().add(Component.literal("SilentTinkers payload invalid").withStyle(ChatFormatting.RED));
         }
@@ -170,13 +174,49 @@ public final class CompositeTooltipEvents {
 
     /** Compact information intended for normal play; F3+H reveals the full diagnostic block. */
     private static void appendPlayerSummary(ItemTooltipEvent event, Optional<SourceVisualIdentity> visualSource,
-                                            int starChargeLevel, int ingredientCount) {
-        StringBuilder summary = new StringBuilder("Composite alloy");
-        if (ingredientCount > 1) summary.append(" • ").append(ingredientCount).append(" materials");
+                                            int starChargeLevel, com.anthonyahellman.silenttinkers.material.AlloyComposition composition) {
+        StringBuilder summary = new StringBuilder(compositionLabel(composition));
         visualSource.flatMap(SourceVisualIdentity::silentGearGrade)
                 .ifPresent(grade -> summary.append(" • Grade ").append(grade));
         if (starChargeLevel > 0) summary.append(" • Starcharged ").append(starChargeLevel);
         event.getToolTip().add(Component.literal(summary.toString()).withStyle(ChatFormatting.LIGHT_PURPLE));
+    }
+
+    /** Replaces Tinkers' static synthetic-material label with the encoded alloy's actual identity. */
+    private static void applyCompositionLabels(ItemTooltipEvent event,
+                                               com.anthonyahellman.silenttinkers.material.AlloyComposition composition) {
+        String label = compositionLabel(composition);
+        for (int index = 0; index < event.getToolTip().size(); index++) {
+            Component original = event.getToolTip().get(index);
+            String text = original.getString();
+            if (!text.contains("Composite Alloy")) continue;
+            event.getToolTip().set(index, Component.literal(text.replace("Composite Alloy", label))
+                    .withStyle(original.getStyle()));
+        }
+    }
+
+    private static String compositionLabel(
+            com.anthonyahellman.silenttinkers.material.AlloyComposition composition) {
+        if (composition.ingredients().size() == 1) {
+            return humanize(composition.ingredients().get(0).materialId().getPath());
+        }
+        return "Alloy: " + composition.ingredients().stream()
+                .map(ingredient -> humanize(ingredient.materialId().getPath()) + " "
+                        + formatPercent(100.0 * ingredient.units() / composition.totalUnits()) + "%")
+                .collect(Collectors.joining(" + "));
+    }
+
+    private static String humanize(String path) {
+        return java.util.Arrays.stream(path.replace('-', '_').split("_"))
+                .filter(word -> !word.isEmpty())
+                .map(word -> Character.toUpperCase(word.charAt(0)) + word.substring(1))
+                .collect(Collectors.joining(" "));
+    }
+
+    private static String formatPercent(double percent) {
+        return Math.abs(percent - Math.rint(percent)) < 0.05
+                ? Long.toString(Math.round(percent))
+                : String.format(java.util.Locale.ROOT, "%.1f", percent);
     }
 
     private static void appendDynamicStats(ItemTooltipEvent event, AlloyStatSnapshot stats) {
