@@ -1,6 +1,7 @@
 package com.anthonyahellman.silenttinkers.item;
 
 import com.anthonyahellman.silenttinkers.material.AlloyPayload;
+import com.anthonyahellman.silenttinkers.material.AlloyDisplayFormatter;
 import com.anthonyahellman.silenttinkers.material.MaterialIngredient;
 import com.anthonyahellman.silenttinkers.material.AlloyStatSnapshot;
 import net.minecraft.ChatFormatting;
@@ -22,13 +23,18 @@ public final class CompositeAlloySampleItem extends Item {
     @Override
     public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tooltip, TooltipFlag flag) {
         AlloyPayload.read(stack).ifPresent(composition -> {
+            tooltip.add(Component.literal(AlloyDisplayFormatter.compositionLabel(composition))
+                    .withStyle(ChatFormatting.LIGHT_PURPLE));
             tooltip.add(Component.translatable("tooltip.silenttinkers.fingerprint", composition.fingerprint())
                     .withStyle(ChatFormatting.DARK_GRAY));
             for (MaterialIngredient ingredient : composition.ingredients()) {
-                double percent = 100.0 * ingredient.units() / composition.totalUnits();
-                tooltip.add(Component.literal(String.format("%s: %.1f%%", ingredient.materialId(), percent))
+                tooltip.add(Component.literal(AlloyDisplayFormatter.ingredientLabel(composition, ingredient))
                         .withStyle(ChatFormatting.GRAY));
             }
+            AlloyPayload.readVisualSource(stack).ifPresent(visual -> tooltip.add(
+                    Component.literal("Visual source: " + visual.itemId()
+                                    + (visual.itemTag().isPresent() ? " (dynamic tag preserved)" : ""))
+                            .withStyle(ChatFormatting.AQUA)));
             int starChargeLevel = AlloyPayload.readStarChargeLevel(stack);
             if (starChargeLevel > 0) {
                 tooltip.add(Component.translatable("tooltip.silenttinkers.starcharged", starChargeLevel)

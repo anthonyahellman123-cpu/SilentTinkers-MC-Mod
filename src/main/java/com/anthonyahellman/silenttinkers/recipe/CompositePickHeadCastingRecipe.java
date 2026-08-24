@@ -2,7 +2,9 @@ package com.anthonyahellman.silenttinkers.recipe;
 
 import com.anthonyahellman.silenttinkers.SilentTinkersMod;
 import com.anthonyahellman.silenttinkers.material.AlloyPayload;
+import com.anthonyahellman.silenttinkers.material.AlloyStatSnapshot;
 import com.anthonyahellman.silenttinkers.material.AlloyVariantCodec;
+import com.anthonyahellman.silenttinkers.material.SourceVisualIdentity;
 import com.anthonyahellman.silenttinkers.registry.ModFluids;
 import com.anthonyahellman.silenttinkers.registry.ModRecipes;
 import net.minecraft.core.RegistryAccess;
@@ -20,7 +22,10 @@ import slimeknights.tconstruct.library.recipe.FluidValues;
 import slimeknights.tconstruct.library.recipe.TinkerRecipeTypes;
 import slimeknights.tconstruct.library.recipe.casting.AbstractCastingRecipe;
 import slimeknights.tconstruct.library.recipe.casting.ICastingContainer;
+import slimeknights.tconstruct.library.tools.part.IMaterialItem;
 import slimeknights.tconstruct.tools.TinkerToolParts;
+
+import java.util.Optional;
 
 /** First real Tinkers part produced from a dynamic Silent Gear alloy. */
 public final class CompositePickHeadCastingRecipe extends AbstractCastingRecipe {
@@ -55,11 +60,45 @@ public final class CompositePickHeadCastingRecipe extends AbstractCastingRecipe 
     public ItemStack assemble(ICastingContainer inventory, RegistryAccess access) {
         return AlloyPayload.read(inventory.getFluidTag()).map(composition -> {
             int starChargeLevel = AlloyPayload.readStarChargeLevel(inventory.getFluidTag());
-            MaterialVariantId variant = MaterialVariantId.create(
-                    MATERIAL, AlloyVariantCodec.encode(
-                            composition, starChargeLevel, AlloyPayload.readStats(inventory.getFluidTag())));
-            ItemStack part = TinkerToolParts.pickHead.get().withMaterial(variant);
-            AlloyPayload.write(part, composition, starChargeLevel, AlloyPayload.readStats(inventory.getFluidTag()));
+            Optional<AlloyStatSnapshot> sourceStats = AlloyPayload.readStats(inventory.getFluidTag());
+            Optional<SourceVisualIdentity> visualSource = AlloyPayload.readVisualSource(inventory.getFluidTag());
+            String encoded = AlloyVariantCodec.encode(composition, starChargeLevel, sourceStats, visualSource);
+            MaterialVariantId variant = MaterialVariantId.create(MATERIAL, encoded);
+
+            ItemStack part = TinkerToolParts.pickHead.get().withMaterialForDisplay(variant);
+            AlloyPayload.write(part, composition, starChargeLevel, sourceStats, visualSource);
+
+            MaterialVariantId stored = IMaterialItem.getMaterialFromStack(part);
+            if (!variant.equals(stored)) {
+                SilentTinkersMod.LOGGER.error(
+                        "[SilentTinkers:CAST_VARIANT_MISMATCH] requested={} stored={} composition={}",
+                        variant, stored, composition.fingerprint());
+                return part;
+            }
+
+            try {
+                boolean compositionMatches = composition.fingerprint().equals(
+                        AlloyVariantCodec.decode(stored.getVariant()).fingerprint());
+                Optional<AlloyStatSnapshot> storedVariantStats = AlloyVariantCodec.decodeStats(stored.getVariant());
+                Optional<ResourceLocation> storedVisualSource = AlloyVariantCodec.decodeVisualSourceItemId(stored.getVariant());
+                boolean statsMatch = sourceStats.equals(storedVariantStats);
+                boolean visualSourceMatches = visualSource.map(SourceVisualIdentity::itemId).equals(storedVisualSource);
+                if (!compositionMatches || !statsMatch || !visualSourceMatches) {
+                    SilentTinkersMod.LOGGER.error(
+                            "[SilentTinkers:CAST_VARIANT_PAYLOAD_MISMATCH] material={} compositionMatches={} statsMatch={} visualSourceMatches={} sourceStatsPresent={} storedVariantStatsPresent={}",
+                            stored, compositionMatches, statsMatch, visualSourceMatches,
+                            sourceStats.isPresent(), storedVariantStats.isPresent());
+                } else {
+                    SilentTinkersMod.LOGGER.info(
+                            "[SilentTinkers:CAST_VARIANT_STORED] material={} composition={} statsPresent={} visualSource={} variantPayloadVerified=true",
+                            stored, composition.fingerprint(), sourceStats.isPresent(),
+                            storedVisualSource.map(Object::toString).orElse("NONE"));
+                }
+            } catch (IllegalArgumentException exception) {
+                SilentTinkersMod.LOGGER.error(
+                        "[SilentTinkers:CAST_VARIANT_PAYLOAD_INVALID] material={} -- stored Tinkers variant could not be decoded after casting",
+                        stored, exception);
+            }
             return part;
         }).orElse(ItemStack.EMPTY);
     }
