@@ -2,6 +2,7 @@
 	default_hide_dependency_lines: false
 	default_quest_shape: "hexagon"
 	filename: "silenttinkers"
+	group: "51A17E17A5C0DE00"
 	icon: "silenttinkers:composite_alloy_sample"
 	id: "51A17E17A5C0DE01"
 	order_index: 0
