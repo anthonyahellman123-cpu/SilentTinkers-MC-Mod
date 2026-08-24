@@ -38,7 +38,14 @@ public final class SilentGearAlloyReader {
             return Optional.empty();
         }
 
-        CompoundTag root = stack.getTag();
+        return readMaterials(stack.getTag());
+    }
+
+    /**
+     * Parses the serialized Silent Gear material list without requiring the
+     * original item. Package visibility keeps this boundary directly testable.
+     */
+    static Optional<AlloyComposition> readMaterials(CompoundTag root) {
         if (root == null || !root.contains(MATERIALS_KEY, Tag.TAG_LIST)) {
             return Optional.empty();
         }
@@ -86,7 +93,11 @@ public final class SilentGearAlloyReader {
                 throw new IllegalArgumentException("Invalid Silent Gear material ID");
             }
 
-            long count = material.contains(COUNT_KEY, Tag.TAG_BYTE) ? material.getByte(COUNT_KEY) : 1L;
+            // Silent Gear currently writes a byte, but accepting every numeric
+            // NBT width prevents add-ons from silently collapsing 70/30 to 50/50.
+            long count = material.contains(COUNT_KEY, Tag.TAG_ANY_NUMERIC)
+                    ? material.getLong(COUNT_KEY)
+                    : 1L;
             if (count <= 0) {
                 throw new IllegalArgumentException("Invalid Silent Gear material count");
             }
