@@ -28,6 +28,7 @@ public final class FtbQuestMaterialExporter {
     private static final double MATERIAL_SPACING = 1.25;
     private static final double MATERIAL_SIZE = 0.75;
     private static final String GUIDE_UNLOCK_ID = "51A17E17A5C0DE02";
+    private static final String CHAPTER_GROUP_ID = "51A17E17A5C0DE00";
     private static final String CORE_CHAPTER_ID = "51A17E17A5C0DE20";
     private static final String ADDON_CHAPTER_ID = "51A17E17A5C0DE30";
 
@@ -113,6 +114,7 @@ public final class FtbQuestMaterialExporter {
                 .append("\tdefault_hide_dependency_lines: true\n")
                 .append("\tdefault_quest_shape: \"circle\"\n")
                 .append("\tfilename: \"").append(filename).append("\"\n")
+                .append("\tgroup: \"").append(CHAPTER_GROUP_ID).append("\"\n")
                 .append("\ticon: \"").append(icon).append("\"\n")
                 .append("\tid: \"").append(chapterId).append("\"\n")
                 .append("\torder_index: ").append(order).append("\n")
@@ -151,6 +153,7 @@ public final class FtbQuestMaterialExporter {
                     .append("\t\t\ticon: \"").append(entry.item()).append("\"\n")
                     .append("\t\t\tid: \"").append(id("material:" + entry.item())).append("\"\n")
                     .append("\t\t\tsize: ").append(decimal(MATERIAL_SIZE)).append("d\n")
+                    .append("\t\t\tsubtitle: \"").append(escape(entry.hoverText())).append("\"\n")
                     .append("\t\t\ttitle: \"").append(escape(humanize(entry.item().getPath()))).append("\"\n")
                     .append("\t\t\tx: ").append(decimal(x)).append("d\n")
                     .append("\t\t\ty: ").append(decimal(y)).append("d\n")
@@ -209,19 +212,25 @@ public final class FtbQuestMaterialExporter {
     }
 
     private record Entry(ResourceLocation item, ResourceLocation material,
-                         MaterialProfile.Ecosystem ecosystem, List<String> descriptionLines) {
+                         MaterialProfile.Ecosystem ecosystem, List<String> descriptionLines,
+                         String hoverText) {
         private static Entry from(UnifiedMaterialDiscovery.Snapshot snapshot,
                                   MaterialGenerationEvaluation evaluation) {
             MaterialGenerationRequest request = evaluation.request();
             ResourceLocation material = request.sourceMaterialId().orElseThrow();
             MaterialProfile.Ecosystem ecosystem = request.source().orElseThrow();
             List<String> lines = new ArrayList<>();
+            List<String> hover = new ArrayList<>();
             evaluation.translatedStats().ifPresent(stats -> {
                 lines.add("Head stats - durability " + number(stats.durability())
                         + ", mining speed " + number(stats.miningSpeed())
                         + ", melee damage " + number(stats.meleeDamage())
                         + ", attack speed " + signed(stats.attackSpeed()));
                 lines.add("Harvest tier: " + humanize(stats.harvestTier().getPath()));
+                hover.add("Durability " + number(stats.durability()));
+                hover.add("Speed " + number(stats.miningSpeed()));
+                hover.add("Damage " + number(stats.meleeDamage()));
+                hover.add("Tier " + humanize(stats.harvestTier().getPath()));
             });
             evaluation.tinkersSourceStats().ifPresent(stats -> {
                 lines.add("Head stats - durability " + stats.headDurability()
@@ -232,15 +241,23 @@ public final class FtbQuestMaterialExporter {
                         + ", attack speed " + percent(stats.handleAttackSpeedModifier())
                         + ", damage " + percent(stats.handleDamageModifier()));
                 lines.add("Harvest tier: " + humanize(stats.harvestTier().getPath()));
+                hover.add("Durability " + stats.headDurability());
+                hover.add("Speed " + number(stats.headMiningSpeed()));
+                hover.add("Damage " + number(stats.headMeleeAttack()));
+                hover.add("Tier " + humanize(stats.harvestTier().getPath()));
             });
             List<ResourceLocation> traits = traits(snapshot, request.physicalItem(), material, ecosystem);
             lines.add(traits.isEmpty() ? "Base head traits: none reported"
                     : "Base head traits: " + traits.stream().map(ResourceLocation::getPath).map(FtbQuestMaterialExporter::humanize)
                     .collect(Collectors.joining(", ")));
+            hover.add(traits.isEmpty() ? "Traits: none"
+                    : "Traits: " + traits.stream().map(ResourceLocation::getPath)
+                    .map(FtbQuestMaterialExporter::humanize).collect(Collectors.joining(", ")));
             lines.add(ecosystem == MaterialProfile.Ecosystem.TINKERS_CONSTRUCT
                     ? "Native Tinkers material; values shown are its currently loaded base stats."
                     : "Silent Gear material; can be melted into dynamic composite alloy for supported Tinkers parts.");
-            return new Entry(request.physicalItem(), material, ecosystem, List.copyOf(lines));
+            return new Entry(request.physicalItem(), material, ecosystem, List.copyOf(lines),
+                    String.join(" • ", hover));
         }
 
         private static List<ResourceLocation> traits(UnifiedMaterialDiscovery.Snapshot snapshot,
