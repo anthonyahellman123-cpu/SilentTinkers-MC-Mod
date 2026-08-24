@@ -76,7 +76,7 @@ public final class FtbQuestMaterialExporter {
     private static String buildCoreChapter(List<Entry> materials) {
         String icon = materials.isEmpty() ? "minecraft:iron_ingot" : materials.get(0).item().toString();
         StringBuilder out = chapterStart("silenttinkers_available_materials", CORE_CHAPTER_ID,
-                icon, "Available Materials", 1);
+                icon, "Available Materials", 2);
         appendMaterialGrid(out, materials, -7.0, 0.0, 12);
         return chapterEnd(out);
     }
@@ -86,7 +86,7 @@ public final class FtbQuestMaterialExporter {
                 .map(entry -> entry.item().toString())
                 .orElse("silenttinkers:composite_alloy_sample");
         StringBuilder out = chapterStart("silenttinkers_addon_materials", ADDON_CHAPTER_ID,
-                icon, "Modded Add-on Materials", 2);
+                icon, "Modded Add-on Materials", 1);
         double y = 0.0;
         for (Map.Entry<String, List<Entry>> group : groups.entrySet()) {
             List<Entry> entries = group.getValue();
