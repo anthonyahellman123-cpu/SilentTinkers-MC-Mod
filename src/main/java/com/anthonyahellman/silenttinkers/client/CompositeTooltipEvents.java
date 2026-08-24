@@ -46,6 +46,7 @@ public final class CompositeTooltipEvents {
     private static void appendCompositePartTooltip(ItemTooltipEvent event, ItemStack stack) {
         AlloyPayload.read(stack).ifPresent(composition -> {
             applyCompositionLabels(event, composition);
+            AlloyPayload.readStats(stack).ifPresent(stats -> replaceStaticPartStats(event, stats));
             appendPlayerSummary(event, AlloyPayload.readVisualSource(stack),
                     AlloyPayload.readStarChargeLevel(stack), composition);
             if (!event.getFlags().isAdvanced()) return;
@@ -196,12 +197,72 @@ public final class CompositeTooltipEvents {
     }
 
     private static void appendDynamicStats(ItemTooltipEvent event, AlloyStatSnapshot stats) {
-        event.getToolTip().add(Component.literal("Dynamic head stats (applied on assembled tool)")
+        event.getToolTip().add(Component.literal("Encoded dynamic head stats")
                 .withStyle(ChatFormatting.YELLOW));
         event.getToolTip().add(Component.literal("Durability: " + stats.durability()).withStyle(ChatFormatting.GRAY));
         event.getToolTip().add(Component.literal("Mining speed: " + stats.miningSpeed()).withStyle(ChatFormatting.GRAY));
         event.getToolTip().add(Component.literal("Melee damage: " + stats.meleeDamage()).withStyle(ChatFormatting.GRAY));
         event.getToolTip().add(Component.literal("Attack speed: " + stats.attackSpeed()).withStyle(ChatFormatting.GRAY));
         event.getToolTip().add(Component.literal("Harvest tier: " + stats.harvestTier()).withStyle(ChatFormatting.GRAY));
+    }
+
+    /**
+     * Tinkers builds a material-part tooltip from the registered base material before this event fires.
+     * Our registered material deliberately contains safe placeholder stats, while the real alloy snapshot
+     * lives on the individual cast head. Replace those placeholder lines for normal play instead of only
+     * revealing the correct values in the advanced diagnostic section.
+     */
+    private static void replaceStaticPartStats(ItemTooltipEvent event, AlloyStatSnapshot stats) {
+        boolean durability = replaceTooltipLine(event, "Durability:",
+                "Durability: " + formatStat(stats.durability()), ChatFormatting.GREEN);
+        boolean tier = replaceTooltipLine(event, "Mining Tier:",
+                "Mining Tier: " + displayTier(stats.harvestTier()), ChatFormatting.GOLD);
+        boolean speed = replaceTooltipLine(event, "Mining Speed:",
+                "Mining Speed: " + formatStat(stats.miningSpeed()), ChatFormatting.AQUA);
+        boolean damage = replaceTooltipLine(event, "Melee Damage:",
+                "Melee Damage: " + formatStat(stats.meleeDamage()), ChatFormatting.RED);
+
+        // Be defensive around Tinkers/add-on tooltip layout changes: if its placeholder block was not
+        // present, the encoded values must still be visible rather than silently falling back to Wood/1.
+        if (!(durability && tier && speed && damage)) {
+            event.getToolTip().add(Component.literal("Head stats").withStyle(ChatFormatting.UNDERLINE));
+            if (!durability) event.getToolTip().add(Component.literal(
+                    "Durability: " + formatStat(stats.durability())).withStyle(ChatFormatting.GREEN));
+            if (!tier) event.getToolTip().add(Component.literal(
+                    "Mining Tier: " + displayTier(stats.harvestTier())).withStyle(ChatFormatting.GOLD));
+            if (!speed) event.getToolTip().add(Component.literal(
+                    "Mining Speed: " + formatStat(stats.miningSpeed())).withStyle(ChatFormatting.AQUA));
+            if (!damage) event.getToolTip().add(Component.literal(
+                    "Melee Damage: " + formatStat(stats.meleeDamage())).withStyle(ChatFormatting.RED));
+        }
+    }
+
+    private static boolean replaceTooltipLine(ItemTooltipEvent event, String prefix,
+                                              String replacement, ChatFormatting valueColor) {
+        for (int index = 0; index < event.getToolTip().size(); index++) {
+            if (!event.getToolTip().get(index).getString().trim().startsWith(prefix)) continue;
+            event.getToolTip().set(index, Component.literal(replacement).withStyle(valueColor));
+            return true;
+        }
+        return false;
+    }
+
+    private static String formatStat(float value) {
+        if (Math.abs(value - Math.round(value)) < 0.0001f) return Integer.toString(Math.round(value));
+        return String.format(java.util.Locale.ROOT, "%.2f", value)
+                .replaceAll("0+$", "")
+                .replaceAll("\\.$", "");
+    }
+
+    private static String displayTier(net.minecraft.resources.ResourceLocation tier) {
+        String path = tier.getPath().replace('_', ' ');
+        StringBuilder result = new StringBuilder(path.length());
+        boolean capitalize = true;
+        for (int index = 0; index < path.length(); index++) {
+            char character = path.charAt(index);
+            result.append(capitalize ? Character.toUpperCase(character) : character);
+            capitalize = character == ' ';
+        }
+        return result.toString();
     }
 }
