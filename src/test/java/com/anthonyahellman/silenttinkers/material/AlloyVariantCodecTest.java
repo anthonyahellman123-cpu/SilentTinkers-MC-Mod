@@ -19,6 +19,28 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class AlloyVariantCodecTest {
     @Test
+    void thirtySeventyPercentagesSurviveFinishedToolNbtPersistence() {
+        AlloyComposition composition = AlloyComposition.of(Map.of(
+                new ResourceLocation("silentgear", "iron"), 30L,
+                new ResourceLocation("silentgear", "redstone"), 70L));
+        AlloyStatSnapshot stats = new AlloyStatSnapshot(
+                640.0f, 8.5f, 3.25f, 0.0f,
+                new ResourceLocation("minecraft", "diamond"));
+
+        MaterialVariantId variant = MaterialVariantId.create(
+                new MaterialId("silenttinkers", "composite_alloy"),
+                AlloyVariantCodec.encode(composition, 0, Optional.of(stats)));
+        MaterialNBT restored = MaterialNBT.readFromNBT(
+                MaterialNBT.of(MaterialVariant.of(variant)).serializeToNBT());
+        AlloyComposition decoded = AlloyVariantCodec.decode(
+                restored.get(0).getVariant().getVariant());
+
+        assertEquals(0.30, decoded.fraction(new ResourceLocation("silentgear", "iron")), 0.000_001);
+        assertEquals(0.70, decoded.fraction(new ResourceLocation("silentgear", "redstone")), 0.000_001);
+        assertEquals(composition.fingerprint(), decoded.fingerprint());
+    }
+
+    @Test
     void elementiumPayloadRoundTripsThroughVariantString() {
         ResourceLocation elementium = new ResourceLocation("silentcompat", "elementium");
         Map<ResourceLocation, Long> ingredients = new LinkedHashMap<>();
