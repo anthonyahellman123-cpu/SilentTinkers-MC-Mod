@@ -34,6 +34,7 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
     private static final float PLACEHOLDER_DURABILITY = 1.0f;
     private static final float PLACEHOLDER_MINING_SPEED = 1.0f;
     private static final float PLACEHOLDER_MELEE_DAMAGE = 1.0f;
+    private static final String ENCODED_VARIANT_PREFIX = "v1.";
 
     @Override
     protected void registerHooks(ModuleHookMap.Builder hookBuilder) {
@@ -57,9 +58,16 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
             if (!material.getVariant().getId().equals(CompositePickHeadCastingRecipe.MATERIAL)) {
                 continue;
             }
+            String variant = material.getVariant().getVariant();
+            // TConstruct creates base/display material instances whose variant is just
+            // "silenttinkers:composite_alloy". Those do not carry an alloy payload and
+            // must not be fed to the v1 codec used by real cast composite parts.
+            if (!variant.startsWith(ENCODED_VARIANT_PREFIX)) {
+                continue;
+            }
             AlloyComposition composition;
             try {
-                composition = AlloyVariantCodec.decode(material.getVariant().getVariant());
+                composition = AlloyVariantCodec.decode(variant);
             } catch (IllegalArgumentException exception) {
                 continue;
             }
@@ -117,9 +125,13 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
             if (!material.getVariant().getId().equals(CompositePickHeadCastingRecipe.MATERIAL)) {
                 continue;
             }
+            String variant = material.getVariant().getVariant();
+            if (!variant.startsWith(ENCODED_VARIANT_PREFIX)) {
+                continue;
+            }
             Optional<AlloyStatSnapshot> decoded;
             try {
-                decoded = AlloyVariantCodec.decodeStats(material.getVariant().getVariant());
+                decoded = AlloyVariantCodec.decodeStats(variant);
             } catch (IllegalArgumentException exception) {
                 continue;
             }
