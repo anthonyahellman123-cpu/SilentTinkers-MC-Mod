@@ -76,7 +76,7 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
             }
             Collection<ResourceLocation> registeredMaterialIds = registry.getAllMaterials().stream()
                     .map(IMaterial::getIdentifier)
-                    .map(MaterialId::getId)
+                    .map(id -> new ResourceLocation(id.getNamespace(), id.getPath()))
                     .toList();
             List<TraitForwardingPlan.Decision<ModifierEntry>> decisions = TraitForwardingPlan.create(
                     composition,
