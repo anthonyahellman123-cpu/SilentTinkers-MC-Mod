@@ -17,6 +17,14 @@ class TraitThresholdsTest {
     }
 
     @Test
+    void exactQuarterShareReceivesPrimaryTraits() {
+        TraitThresholds thresholds = new TraitThresholds(25, 50, 75);
+
+        assertEquals(TraitAccess.NONE, thresholds.accessFor(24.999));
+        assertEquals(TraitAccess.PRIMARY, thresholds.accessFor(25.0));
+    }
+
+    @Test
     void zeroThresholdsReleaseThePest() {
         TraitThresholds thresholds = new TraitThresholds(0, 0, 0);
 
