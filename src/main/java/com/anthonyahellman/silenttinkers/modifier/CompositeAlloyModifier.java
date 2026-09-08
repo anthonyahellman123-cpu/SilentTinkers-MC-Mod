@@ -39,6 +39,7 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
     private static final float PLACEHOLDER_DURABILITY = 1.0f;
     private static final float PLACEHOLDER_MINING_SPEED = 1.0f;
     private static final float PLACEHOLDER_MELEE_DAMAGE = 1.0f;
+    private static final String ENCODED_VARIANT_PREFIX = "v1.";
     private static final Set<String> LOGGED_STAT_VARIANTS = ConcurrentHashMap.newKeySet();
     private static final Set<String> LOGGED_MISSING_STAT_VARIANTS = ConcurrentHashMap.newKeySet();
     private static final Set<String> LOGGED_CONTEXTS_WITHOUT_COMPOSITE = ConcurrentHashMap.newKeySet();
@@ -55,10 +56,19 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
         if (!firstEncounter) return;
         IMaterialRegistry registry = MaterialRegistry.getInstance();
         for (MaterialVariant material : context.getMaterials()) {
-            if (!material.getVariant().getId().equals(CompositePickHeadCastingRecipe.MATERIAL)) continue;
+            if (!material.getVariant().getId().equals(CompositePickHeadCastingRecipe.MATERIAL)) {
+                continue;
+            }
+            String variant = material.getVariant().getVariant();
+            // TConstruct creates base/display material instances whose variant is just
+            // "silenttinkers:composite_alloy". Those do not carry an alloy payload and
+            // must not be fed to the v1 codec used by real cast composite parts.
+            if (!variant.startsWith(ENCODED_VARIANT_PREFIX)) {
+                continue;
+            }
             AlloyComposition composition;
             try {
-                composition = AlloyVariantCodec.decode(material.getVariant().getVariant());
+                composition = AlloyVariantCodec.decode(variant);
             } catch (IllegalArgumentException exception) {
                 continue;
             }
@@ -99,11 +109,17 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
     public void addToolStats(IToolContext context, ModifierEntry modifier, ModifierStatsBuilder builder) {
         boolean foundComposite = false;
         for (MaterialVariant material : context.getMaterials()) {
-            if (!material.getVariant().getId().equals(CompositePickHeadCastingRecipe.MATERIAL)) continue;
+            if (!material.getVariant().getId().equals(CompositePickHeadCastingRecipe.MATERIAL)) {
+                continue;
+            }
             foundComposite = true;
+            String variant = material.getVariant().getVariant();
+            if (!variant.startsWith(ENCODED_VARIANT_PREFIX)) {
+                continue;
+            }
             Optional<AlloyStatSnapshot> decoded;
             try {
-                decoded = AlloyVariantCodec.decodeStats(material.getVariant().getVariant());
+                decoded = AlloyVariantCodec.decodeStats(variant);
             } catch (IllegalArgumentException exception) {
                 SilentTinkersMod.LOGGER.warn("[SilentTinkers:COMPOSITE_STATS_DECODE_FAILED] variant={}", material.getVariant(), exception);
                 continue;
