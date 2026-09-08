@@ -229,4 +229,32 @@ final class AlloyVariantCodecTest {
         assertEquals(composition.fingerprint(), AlloyVariantCodec.decode(restoredVariant).fingerprint());
         assertEquals(stats, AlloyVariantCodec.decodeStats(restoredVariant).orElseThrow());
     }
+
+    @Test
+    void fourMaterialQuarterSharesAndStatsSurviveFinishedToolPersistence() {
+        Map<ResourceLocation, Long> ingredients = new LinkedHashMap<>();
+        ingredients.put(new ResourceLocation("silentgear", "iron"), 25L);
+        ingredients.put(new ResourceLocation("silentcompat", "elementium"), 25L);
+        ingredients.put(new ResourceLocation("tinkers_advanced", "antimony"), 25L);
+        ingredients.put(new ResourceLocation("tcompat", "calorite"), 25L);
+        AlloyComposition composition = AlloyComposition.of(ingredients);
+        AlloyStatSnapshot stats = new AlloyStatSnapshot(
+                4096.0f, 14.25f, 11.5f, 0.2f,
+                new ResourceLocation("minecraft", "netherite"));
+        MaterialVariantId original = MaterialVariantId.create(
+                new MaterialId("silenttinkers", "composite_alloy"),
+                AlloyVariantCodec.encode(composition, 0, Optional.of(stats)));
+
+        MaterialNBT restored = MaterialNBT.readFromNBT(
+                MaterialNBT.of(MaterialVariant.of(original)).serializeToNBT());
+        String restoredVariant = restored.get(0).getVariant().getVariant();
+        AlloyComposition decoded = AlloyVariantCodec.decode(restoredVariant);
+
+        assertEquals(4, decoded.ingredients().size());
+        for (ResourceLocation material : ingredients.keySet()) {
+            assertEquals(0.25, decoded.fraction(material), 0.000_001);
+        }
+        assertEquals(composition.fingerprint(), decoded.fingerprint());
+        assertEquals(stats, AlloyVariantCodec.decodeStats(restoredVariant).orElseThrow());
+    }
 }

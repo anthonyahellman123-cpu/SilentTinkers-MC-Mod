@@ -22,6 +22,8 @@ class TraitThresholdsTest {
 
         assertEquals(TraitAccess.NONE, thresholds.accessFor(24.999));
         assertEquals(TraitAccess.PRIMARY, thresholds.accessFor(25.0));
+        assertEquals(TraitAccess.SECONDARY, thresholds.accessFor(50.0));
+        assertEquals(TraitAccess.FULL, thresholds.accessFor(75.0));
     }
 
     @Test

@@ -25,7 +25,7 @@ class AlloyCompositionTest {
     void equalFourWayAlloyPreservesExactQuarterSharesAndStats() {
         Map<ResourceLocation, Long> fourWay = new LinkedHashMap<>();
         fourWay.put(id("silentgear:iron"), 25L);
-        fourWay.put(id("silentgear:redstone"), 25L);
+        fourWay.put(id("tcompat:calorite"), 25L);
         fourWay.put(id("tinkers_advanced:antimony"), 25L);
         fourWay.put(id("silentcompat:elementium"), 25L);
 
@@ -37,7 +37,7 @@ class AlloyCompositionTest {
 
         assertEquals(4, restored.ingredients().size());
         assertEquals(0.25, restored.fraction(id("silentgear:iron")), 0.000_001);
-        assertEquals(0.25, restored.fraction(id("silentgear:redstone")), 0.000_001);
+        assertEquals(0.25, restored.fraction(id("tcompat:calorite")), 0.000_001);
         assertEquals(0.25, restored.fraction(id("tinkers_advanced:antimony")), 0.000_001);
         assertEquals(0.25, restored.fraction(id("silentcompat:elementium")), 0.000_001);
         assertEquals(original.fingerprint(), restored.fingerprint());

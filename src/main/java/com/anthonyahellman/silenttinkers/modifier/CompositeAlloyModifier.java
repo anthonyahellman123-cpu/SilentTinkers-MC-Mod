@@ -2,12 +2,12 @@ package com.anthonyahellman.silenttinkers.modifier;
 
 import com.anthonyahellman.silenttinkers.SilentTinkersMod;
 import com.anthonyahellman.silenttinkers.config.SilentTinkersConfig;
-import com.anthonyahellman.silenttinkers.config.TraitAccess;
 import com.anthonyahellman.silenttinkers.material.AlloyComposition;
 import com.anthonyahellman.silenttinkers.material.AlloyStatSnapshot;
 import com.anthonyahellman.silenttinkers.material.AlloyVariantCodec;
-import com.anthonyahellman.silenttinkers.material.MaterialIngredient;
 import com.anthonyahellman.silenttinkers.material.RuntimeBridgeHealth;
+import com.anthonyahellman.silenttinkers.material.TraitForwardingPlan;
+import com.anthonyahellman.silenttinkers.material.TraitSourceResolver;
 import com.anthonyahellman.silenttinkers.recipe.CompositePickHeadCastingRecipe;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Tier;
@@ -28,6 +28,7 @@ import slimeknights.tconstruct.library.tools.stat.ModifierStatsBuilder;
 import slimeknights.tconstruct.library.tools.stat.ToolStats;
 import slimeknights.tconstruct.tools.stats.HeadMaterialStats;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -73,55 +74,46 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
             } catch (IllegalArgumentException exception) {
                 continue;
             }
-            for (MaterialIngredient ingredient : composition.ingredients()) {
-                double materialPercent = 100.0 * ingredient.units() / composition.totalUnits();
-                TraitAccess access = SilentTinkersConfig.traitThresholds().accessFor(materialPercent);
-                if (access == TraitAccess.NONE) continue;
+            Collection<ResourceLocation> registeredMaterialIds = registry.getAllMaterials().stream()
+                    .map(IMaterial::getIdentifier)
+                    .map(MaterialId::getId)
+                    .toList();
+            List<TraitForwardingPlan.Decision<ModifierEntry>> decisions = TraitForwardingPlan.create(
+                    composition,
+                    SilentTinkersConfig.traitThresholds(),
+                    sourceId -> TraitSourceResolver.resolve(sourceId, registeredMaterialIds),
+                    resolvedId -> registry.getTraits(new MaterialId(resolvedId), HeadMaterialStats.ID));
 
-                Optional<MaterialId> resolvedMaterial = resolveTinkersMaterial(registry, ingredient.materialId());
-                String decisionKey = variant + "|" + ingredient.materialId();
-                if (resolvedMaterial.isEmpty()) {
+            for (TraitForwardingPlan.Decision<ModifierEntry> decision : decisions) {
+                String decisionKey = composition.fingerprint() + "|" + decision.sourceMaterialId()
+                        + "|" + decision.access();
+                Optional<TraitSourceResolver.Resolution> resolution = decision.resolution();
+                if (resolution.isPresent() && !resolution.orElseThrow().resolved()) {
                     if (LOGGED_UNRESOLVED_TRAIT_SOURCES.add(decisionKey)) {
                         SilentTinkersMod.LOGGER.warn(
-                                "[SilentTinkers:TRAIT_SOURCE_UNRESOLVED] composite={} source={} percent={} access={} -- no unique Tinkers material could be correlated",
-                                material.getVariant(), ingredient.materialId(), materialPercent, access);
+                                "[SilentTinkers:TRAIT_SOURCE_UNRESOLVED] composite={} source={} percent={} access={} resolution={} candidates={} -- trait forwarding refused",
+                                composition.fingerprint(), decision.sourceMaterialId(), decision.materialPercent(),
+                                decision.access(), resolution.orElseThrow().status(),
+                                resolution.orElseThrow().candidates());
                     }
                     continue;
                 }
 
-                MaterialId materialId = resolvedMaterial.orElseThrow();
-                List<ModifierEntry> traits = registry.getTraits(materialId, HeadMaterialStats.ID);
-                int allowed = switch (access) {
-                    case NONE -> 0;
-                    case PRIMARY -> 1;
-                    case SECONDARY -> 2;
-                    case FULL -> traits.size();
-                };
-                int forwarded = Math.min(allowed, traits.size());
-                traits.stream().limit(forwarded).forEach(builder::add);
+                decision.forwardedTraits().forEach(builder::add);
 
                 if (LOGGED_TRAIT_DECISIONS.add(decisionKey)) {
+                    String resolved = resolution.flatMap(TraitSourceResolver.Resolution::materialId)
+                            .map(Object::toString).orElse("NOT_ELIGIBLE");
+                    String resolutionMode = resolution.map(value -> value.status().name())
+                            .orElse("NOT_ELIGIBLE");
                     SilentTinkersMod.LOGGER.info(
-                            "[SilentTinkers:TRAIT_FORWARD] composite={} source={} resolved={} percent={} access={} available={} forwarded={}",
-                            material.getVariant(), ingredient.materialId(), materialId, materialPercent, access, traits.size(), forwarded);
+                            "[SilentTinkers:TRAIT_FORWARD] composite={} source={} resolved={} resolution={} percent={} access={} available={} forwarded={}",
+                            composition.fingerprint(), decision.sourceMaterialId(), resolved, resolutionMode,
+                            decision.materialPercent(), decision.access(), decision.availableTraitCount(),
+                            decision.forwardedTraits().size());
                 }
             }
         }
-    }
-
-    private static Optional<MaterialId> resolveTinkersMaterial(IMaterialRegistry registry, ResourceLocation sourceId) {
-        MaterialId exact = new MaterialId(sourceId);
-        if (registry.getMaterial(exact) != IMaterial.UNKNOWN) return Optional.of(exact);
-
-        MaterialId tconstruct = new MaterialId("tconstruct", sourceId.getPath());
-        if (registry.getMaterial(tconstruct) != IMaterial.UNKNOWN) return Optional.of(tconstruct);
-
-        List<MaterialId> samePath = registry.getAllMaterials().stream()
-                .map(IMaterial::getIdentifier)
-                .filter(id -> id.getPath().equals(sourceId.getPath()))
-                .distinct()
-                .toList();
-        return samePath.size() == 1 ? Optional.of(samePath.get(0)) : Optional.empty();
     }
 
     @Override
