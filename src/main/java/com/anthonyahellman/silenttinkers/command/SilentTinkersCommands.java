@@ -1,5 +1,6 @@
 package com.anthonyahellman.silenttinkers.command;
 
+import com.anthonyahellman.silenttinkers.config.SilentTinkersConfig;
 import com.anthonyahellman.silenttinkers.material.CompositeBridgeHealth;
 import com.anthonyahellman.silenttinkers.material.MaterialDiscoveryState;
 import com.anthonyahellman.silenttinkers.material.MaterialGenerationEvaluation;
@@ -48,6 +49,7 @@ public final class SilentTinkersCommands {
         int runtimeReady = MaterialDiscoveryState.readyForTinkersCount();
         long deferred = Math.max(0L, readyForTinkers - runtimeReady);
         String fingerprint = MaterialPlanFingerprint.of(snapshot);
+        var traitThresholds = SilentTinkersConfig.traitThresholds();
 
         source.sendSuccess(() -> Component.literal(
                 "SilentTinkers plan " + fingerprint
@@ -63,6 +65,10 @@ public final class SilentTinkersCommands {
                 "TCon→SG ready " + tinkersSourceReady
                         + " | bootstrap pending " + bootstrapPending
                         + " | quarantined " + quarantined), false);
+        source.sendSuccess(() -> Component.literal(
+                "Trait gates primary " + traitThresholds.primaryPercent() + "%"
+                        + " | secondary " + traitThresholds.secondaryPercent() + "%"
+                        + " | full " + traitThresholds.fullPercent() + "%"), false);
         source.sendSuccess(() -> Component.literal(
                 "Composite hook " + CompositeBridgeHealth.status()
                         + " | assembled-tool stats "
