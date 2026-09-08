@@ -42,6 +42,8 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
     private static final Set<String> LOGGED_STAT_VARIANTS = ConcurrentHashMap.newKeySet();
     private static final Set<String> LOGGED_MISSING_STAT_VARIANTS = ConcurrentHashMap.newKeySet();
     private static final Set<String> LOGGED_CONTEXTS_WITHOUT_COMPOSITE = ConcurrentHashMap.newKeySet();
+    private static final Set<String> LOGGED_TRAIT_DECISIONS = ConcurrentHashMap.newKeySet();
+    private static final Set<String> LOGGED_UNRESOLVED_TRAIT_SOURCES = ConcurrentHashMap.newKeySet();
     private static final Set<ResourceLocation> LOGGED_UNKNOWN_TIERS = ConcurrentHashMap.newKeySet();
 
     @Override
@@ -72,19 +74,37 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
                 continue;
             }
             for (MaterialIngredient ingredient : composition.ingredients()) {
-                TraitAccess access = SilentTinkersConfig.traitThresholds()
-                        .accessFor(100.0 * ingredient.units() / composition.totalUnits());
+                double materialPercent = 100.0 * ingredient.units() / composition.totalUnits();
+                TraitAccess access = SilentTinkersConfig.traitThresholds().accessFor(materialPercent);
                 if (access == TraitAccess.NONE) continue;
-                resolveTinkersMaterial(registry, ingredient.materialId()).ifPresent(materialId -> {
-                    List<ModifierEntry> traits = registry.getTraits(materialId, HeadMaterialStats.ID);
-                    int allowed = switch (access) {
-                        case NONE -> 0;
-                        case PRIMARY -> 1;
-                        case SECONDARY -> 2;
-                        case FULL -> traits.size();
-                    };
-                    traits.stream().limit(allowed).forEach(builder::add);
-                });
+
+                Optional<MaterialId> resolvedMaterial = resolveTinkersMaterial(registry, ingredient.materialId());
+                String decisionKey = variant + "|" + ingredient.materialId();
+                if (resolvedMaterial.isEmpty()) {
+                    if (LOGGED_UNRESOLVED_TRAIT_SOURCES.add(decisionKey)) {
+                        SilentTinkersMod.LOGGER.warn(
+                                "[SilentTinkers:TRAIT_SOURCE_UNRESOLVED] composite={} source={} percent={} access={} -- no unique Tinkers material could be correlated",
+                                material.getVariant(), ingredient.materialId(), materialPercent, access);
+                    }
+                    continue;
+                }
+
+                MaterialId materialId = resolvedMaterial.orElseThrow();
+                List<ModifierEntry> traits = registry.getTraits(materialId, HeadMaterialStats.ID);
+                int allowed = switch (access) {
+                    case NONE -> 0;
+                    case PRIMARY -> 1;
+                    case SECONDARY -> 2;
+                    case FULL -> traits.size();
+                };
+                int forwarded = Math.min(allowed, traits.size());
+                traits.stream().limit(forwarded).forEach(builder::add);
+
+                if (LOGGED_TRAIT_DECISIONS.add(decisionKey)) {
+                    SilentTinkersMod.LOGGER.info(
+                            "[SilentTinkers:TRAIT_FORWARD] composite={} source={} resolved={} percent={} access={} available={} forwarded={}",
+                            material.getVariant(), ingredient.materialId(), materialId, materialPercent, access, traits.size(), forwarded);
+                }
             }
         }
     }
