@@ -14,10 +14,45 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class AlloyVariantCodecTest {
+    @Test
+    void validCompositeDecodesExactStats() {
+        AlloyComposition composition = AlloyComposition.of(Map.of(
+                new ResourceLocation("silentgear", "azure_electrum"), 1L));
+        AlloyStatSnapshot expected = new AlloyStatSnapshot(
+                1536.0f, 11.75f, 6.5f, -0.15f,
+                new ResourceLocation("minecraft", "netherite"));
+
+        String encoded = AlloyVariantCodec.encode(composition, 0, Optional.of(expected));
+
+        assertTrue(AlloyVariantCodec.isEncodedVariant(encoded));
+        assertEquals(expected, AlloyVariantCodec.decodeStats(encoded).orElseThrow());
+    }
+
+    @Test
+    void baseDisplayVariantIsNotAnEncodedCompositePayload() {
+        String displayVariant = "silenttinkers:composite_alloy";
+
+        assertFalse(AlloyVariantCodec.isEncodedVariant(displayVariant));
+        assertThrows(IllegalArgumentException.class, () -> AlloyVariantCodec.decode(displayVariant));
+        assertThrows(IllegalArgumentException.class, () -> AlloyVariantCodec.decodeStats(displayVariant));
+    }
+
+    @Test
+    void compositionWithoutStatSuffixIsExplicitlyMissingStats() {
+        AlloyComposition composition = AlloyComposition.of(Map.of(
+                new ResourceLocation("silentgear", "iron"), 1L));
+        String encoded = AlloyVariantCodec.encode(composition);
+
+        assertTrue(AlloyVariantCodec.isEncodedVariant(encoded));
+        assertTrue(AlloyVariantCodec.decodeStats(encoded).isEmpty());
+    }
+
     @Test
     void thirtySeventyPercentagesSurviveFinishedToolNbtPersistence() {
         AlloyComposition composition = AlloyComposition.of(Map.of(
@@ -171,6 +206,27 @@ final class AlloyVariantCodecTest {
                 restoredVisual.itemTag().orElseThrow().getString("VisualFingerprint"));
         assertEquals(42, restoredVisual.itemTag().orElseThrow().getInt("ColorSeed"));
         assertEquals(2, AlloyVariantCodec.decodeStarChargeLevel(restoredVariant));
+        assertEquals(stats, AlloyVariantCodec.decodeStats(restoredVariant).orElseThrow());
+    }
+
+    @Test
+    void threeMaterialCompositionAndStatsSurviveFinishedToolPersistence() {
+        AlloyComposition composition = AlloyComposition.of(Map.of(
+                new ResourceLocation("silentgear", "iron"), 1L,
+                new ResourceLocation("silentcompat", "elementium"), 1L,
+                new ResourceLocation("tinkers_advanced", "neutronium"), 1L));
+        AlloyStatSnapshot stats = new AlloyStatSnapshot(
+                16384.0f, 10.8f, 22.7f, 0.05f,
+                new ResourceLocation("minecraft", "netherite"));
+        MaterialVariantId original = MaterialVariantId.create(
+                new MaterialId("silenttinkers", "composite_alloy"),
+                AlloyVariantCodec.encode(composition, 0, Optional.of(stats)));
+
+        MaterialNBT restored = MaterialNBT.readFromNBT(
+                MaterialNBT.of(MaterialVariant.of(original)).serializeToNBT());
+        String restoredVariant = restored.get(0).getVariant().getVariant();
+
+        assertEquals(composition.fingerprint(), AlloyVariantCodec.decode(restoredVariant).fingerprint());
         assertEquals(stats, AlloyVariantCodec.decodeStats(restoredVariant).orElseThrow());
     }
 }

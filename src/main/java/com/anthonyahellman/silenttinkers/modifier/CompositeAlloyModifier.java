@@ -39,7 +39,6 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
     private static final float PLACEHOLDER_DURABILITY = 1.0f;
     private static final float PLACEHOLDER_MINING_SPEED = 1.0f;
     private static final float PLACEHOLDER_MELEE_DAMAGE = 1.0f;
-    private static final String ENCODED_VARIANT_PREFIX = "v1.";
     private static final Set<String> LOGGED_STAT_VARIANTS = ConcurrentHashMap.newKeySet();
     private static final Set<String> LOGGED_MISSING_STAT_VARIANTS = ConcurrentHashMap.newKeySet();
     private static final Set<String> LOGGED_CONTEXTS_WITHOUT_COMPOSITE = ConcurrentHashMap.newKeySet();
@@ -63,7 +62,7 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
             // TConstruct creates base/display material instances whose variant is just
             // "silenttinkers:composite_alloy". Those do not carry an alloy payload and
             // must not be fed to the v1 codec used by real cast composite parts.
-            if (!variant.startsWith(ENCODED_VARIANT_PREFIX)) {
+            if (!AlloyVariantCodec.isEncodedVariant(variant)) {
                 continue;
             }
             AlloyComposition composition;
@@ -114,7 +113,7 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
             }
             foundComposite = true;
             String variant = material.getVariant().getVariant();
-            if (!variant.startsWith(ENCODED_VARIANT_PREFIX)) {
+            if (!AlloyVariantCodec.isEncodedVariant(variant)) {
                 continue;
             }
             Optional<AlloyStatSnapshot> decoded;

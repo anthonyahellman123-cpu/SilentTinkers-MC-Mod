@@ -22,6 +22,13 @@ public final class AlloyVariantCodec {
 
     private AlloyVariantCodec() {}
 
+    /** True only for versioned payload variants produced by this codec. */
+    public static boolean isEncodedVariant(String encoded) {
+        return encoded != null
+                && encoded.startsWith(PREFIX)
+                && encoded.length() <= MAX_ENCODED_LENGTH;
+    }
+
     public static String encode(AlloyComposition composition) {
         StringBuilder encoded = new StringBuilder(PREFIX);
         for (MaterialIngredient ingredient : composition.ingredients()) {
@@ -202,7 +209,7 @@ public final class AlloyVariantCodec {
     }
 
     private static void validate(String encoded) {
-        if (!encoded.startsWith(PREFIX) || encoded.length() > MAX_ENCODED_LENGTH) {
+        if (!isEncodedVariant(encoded)) {
             throw new IllegalArgumentException("Unsupported alloy variant");
         }
     }

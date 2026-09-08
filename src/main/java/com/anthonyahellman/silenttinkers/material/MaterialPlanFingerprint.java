@@ -42,6 +42,7 @@ public final class MaterialPlanFingerprint {
                 + "|" + request.source().map(Enum::name).orElse("NONE")
                 + "|" + request.sourceMaterialId().map(Object::toString).orElse("NONE")
                 + "|" + request.target().map(Enum::name).orElse("BOTH")
+                + "|" + request.targetMaterialId().map(Object::toString).orElse("NONE")
                 + "|" + request.bootstrapProfile().map(Object::toString).orElse("NONE")
                 + "|" + evaluation.status()
                 + "|translated=" + evaluation.translatedStats().map(Object::toString).orElse("NONE")

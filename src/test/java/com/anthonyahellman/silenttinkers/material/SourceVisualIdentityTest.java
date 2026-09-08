@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SourceVisualIdentityTest {
@@ -33,6 +34,21 @@ class SourceVisualIdentityTest {
         carrier.put(AlloyPayload.ROOT_KEY, root);
 
         assertEquals(visual.itemId(), AlloyPayload.readVisualSource(carrier).orElseThrow().itemId());
+    }
+
+    @Test
+    void toolCastingRequiresCompositionAndEvaluatedStats() {
+        CompoundTag root = AlloyComposition.of(java.util.Map.of(id("silentgear:iron"), 1L)).save();
+        CompoundTag carrier = new CompoundTag();
+        carrier.put(AlloyPayload.ROOT_KEY, root);
+
+        assertFalse(AlloyPayload.isToolCastReady(carrier));
+
+        root.put("EvaluatedStats", new AlloyStatSnapshot(
+                512f, 7f, 3f, 0f, id("minecraft:iron")).save());
+        carrier.put(AlloyPayload.ROOT_KEY, root);
+
+        assertTrue(AlloyPayload.isToolCastReady(carrier));
     }
 
     @Test

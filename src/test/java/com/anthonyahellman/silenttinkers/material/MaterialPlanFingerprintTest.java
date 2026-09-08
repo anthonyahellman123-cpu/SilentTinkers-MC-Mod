@@ -46,13 +46,30 @@ final class MaterialPlanFingerprintTest {
                 MaterialPlanFingerprint.ofEvaluations(List.of(second)));
     }
 
+    @Test
+    void fingerprintIncludesDeterministicTargetIdentity() {
+        MaterialGenerationEvaluation first = readyEvaluation(720.0f);
+        MaterialGenerationRequest request = first.request();
+        MaterialGenerationRequest changedTarget = new MaterialGenerationRequest(
+                request.physicalItem(), request.action(), request.source(), request.target(),
+                request.sourceMaterialId(),
+                Optional.of(new ResourceLocation("silenttinkers", "generated/tinkers_construct/other/elementium")),
+                request.bootstrapProfile());
+        MaterialGenerationEvaluation second = new MaterialGenerationEvaluation(
+                changedTarget, first.status(), first.translatedStats(), first.tinkersSourceStats(), first.detail());
+
+        assertNotEquals(
+                MaterialPlanFingerprint.ofEvaluations(List.of(first)),
+                MaterialPlanFingerprint.ofEvaluations(List.of(second)));
+    }
+
     private static MaterialGenerationEvaluation evaluation(String namespace,
                                                            String path,
                                                            MaterialGenerationEvaluation.Status status) {
         MaterialGenerationRequest request = new MaterialGenerationRequest(
                 new ResourceLocation(namespace, path),
                 MaterialBridgePlan.Action.PRESERVE,
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
         return new MaterialGenerationEvaluation(
                 request, status, Optional.empty(), Optional.empty(), "test");
     }
@@ -65,6 +82,8 @@ final class MaterialPlanFingerprintTest {
                 Optional.of(MaterialProfile.Ecosystem.SILENT_GEAR),
                 Optional.of(MaterialProfile.Ecosystem.TINKERS_CONSTRUCT),
                 Optional.of(sourceMaterial),
+                Optional.of(GeneratedMaterialOwnership.idFor(
+                        MaterialProfile.Ecosystem.TINKERS_CONSTRUCT, sourceMaterial)),
                 Optional.empty());
         TranslatedMaterialStats stats = new TranslatedMaterialStats(
                 durability, 6.2f, 2.0f, 0.0f, new ResourceLocation("minecraft", "diamond"));

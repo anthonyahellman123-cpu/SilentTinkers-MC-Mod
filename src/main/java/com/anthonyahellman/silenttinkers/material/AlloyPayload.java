@@ -114,6 +114,11 @@ public final class AlloyPayload {
                 : Optional.empty();
     }
 
+    /** Real Tinkers parts require both physical composition and evaluated stats. */
+    public static boolean isToolCastReady(CompoundTag carrierTag) {
+        return read(carrierTag).isPresent() && readStats(carrierTag).isPresent();
+    }
+
     public static Optional<SourceVisualIdentity> readVisualSource(ItemStack stack) {
         return readVisualSource(stack.getTag());
     }

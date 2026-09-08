@@ -12,6 +12,7 @@ public record MaterialGenerationRequest(
         Optional<MaterialProfile.Ecosystem> source,
         Optional<MaterialProfile.Ecosystem> target,
         Optional<ResourceLocation> sourceMaterialId,
+        Optional<ResourceLocation> targetMaterialId,
         Optional<BootstrapMaterialProfile> bootstrapProfile) {
 
     public MaterialGenerationRequest {
@@ -20,9 +21,15 @@ public record MaterialGenerationRequest(
         source = Objects.requireNonNull(source, "source");
         target = Objects.requireNonNull(target, "target");
         sourceMaterialId = Objects.requireNonNull(sourceMaterialId, "sourceMaterialId");
+        targetMaterialId = Objects.requireNonNull(targetMaterialId, "targetMaterialId");
         bootstrapProfile = Objects.requireNonNull(bootstrapProfile, "bootstrapProfile");
-        if (action == MaterialBridgePlan.Action.BRIDGE && sourceMaterialId.isEmpty()) {
-            throw new IllegalArgumentException("Bridge generation requires a canonical source material id");
+        if (action == MaterialBridgePlan.Action.BRIDGE
+                && (source.isEmpty() || target.isEmpty()
+                || sourceMaterialId.isEmpty() || targetMaterialId.isEmpty())) {
+            throw new IllegalArgumentException("Bridge generation requires canonical source and target material ids");
+        }
+        if (target.isPresent() != targetMaterialId.isPresent()) {
+            throw new IllegalArgumentException("target ecosystem and target material id must be present together");
         }
     }
 

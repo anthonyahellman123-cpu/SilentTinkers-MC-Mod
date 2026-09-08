@@ -21,6 +21,8 @@ class DynamicTinkersBridgePayloadTest {
                 Optional.of(MaterialProfile.Ecosystem.SILENT_GEAR),
                 Optional.of(MaterialProfile.Ecosystem.TINKERS_CONSTRUCT),
                 Optional.of(material),
+                Optional.of(GeneratedMaterialOwnership.idFor(
+                        MaterialProfile.Ecosystem.TINKERS_CONSTRUCT, material)),
                 Optional.empty());
         MaterialGenerationEvaluation evaluation = new MaterialGenerationEvaluation(
                 request,
@@ -46,7 +48,7 @@ class DynamicTinkersBridgePayloadTest {
         MaterialGenerationRequest request = new MaterialGenerationRequest(
                 id("example:bronze_ingot"),
                 MaterialBridgePlan.Action.PRESERVE,
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
         MaterialGenerationEvaluation evaluation = new MaterialGenerationEvaluation(
                 request,
                 MaterialGenerationEvaluation.Status.PRESERVED,

@@ -24,12 +24,12 @@ public final class MaterialGenerationPlanner {
         MaterialBridgePlan plan = MaterialBridgePlanner.bootstrap(physicalItem);
         BootstrapMaterialProfile profile = BootstrapMaterialResolver.resolve(physicalItem, detectedMiningTier);
         return new MaterialGenerationRequest(plan.physicalItem(), plan.action(), plan.source(), plan.target(),
-                plan.sourceMaterialId(), Optional.of(profile));
+                plan.sourceMaterialId(), plan.targetMaterialId(), Optional.of(profile));
     }
 
     private static MaterialGenerationRequest fromPlan(MaterialBridgePlan plan,
             Optional<BootstrapMaterialProfile> bootstrapProfile) {
         return new MaterialGenerationRequest(plan.physicalItem(), plan.action(), plan.source(), plan.target(),
-                plan.sourceMaterialId(), bootstrapProfile);
+                plan.sourceMaterialId(), plan.targetMaterialId(), bootstrapProfile);
     }
 }

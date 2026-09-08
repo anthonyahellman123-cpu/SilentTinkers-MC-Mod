@@ -10,6 +10,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MaterialBridgePlannerTest {
     @Test
@@ -69,6 +70,21 @@ class MaterialBridgePlannerTest {
         assertEquals(MaterialProfile.Ecosystem.SILENT_GEAR, plan.source().orElseThrow());
         assertEquals(id("silentcompat:elementium"), plan.sourceMaterialId().orElseThrow());
         assertEquals(MaterialProfile.Ecosystem.TINKERS_CONSTRUCT, plan.target().orElseThrow());
+        assertEquals(id("silenttinkers:generated/tinkers_construct/silentcompat/elementium"),
+                plan.targetMaterialId().orElseThrow());
+    }
+
+    @Test
+    void oneSidedGeneratedTargetCannotFeedAnotherGenerationCycle() {
+        MaterialCorrelationIndex index = new MaterialCorrelationIndex();
+        ResourceLocation source = id("tinkers_advanced:neutronium");
+        ResourceLocation generated = GeneratedMaterialOwnership.idFor(
+                MaterialProfile.Ecosystem.SILENT_GEAR, source);
+
+        index.accept(id("silenttinkers:generated_neutronium_ingot"),
+                new MaterialProfile(MaterialProfile.Ecosystem.SILENT_GEAR, generated, List.of()));
+
+        assertTrue(MaterialBridgePlanner.plan(snapshot(index)).isEmpty());
     }
 
     private static UnifiedMaterialDiscovery.Snapshot snapshot(MaterialCorrelationIndex index) {

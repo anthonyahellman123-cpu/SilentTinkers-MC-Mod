@@ -39,6 +39,9 @@ public final class MaterialBridgePlanner {
             Map<MaterialProfile.Ecosystem, MaterialProfile> profiles = candidate.profiles();
             MaterialProfile profile = profiles.values().iterator().next();
             if (correlatedProfiles.contains(ProfileKey.of(profile))) continue;
+            // A one-sided profile bearing our deterministic ownership ID is a
+            // previously generated target, never a new foreign source.
+            if (GeneratedMaterialOwnership.isOwned(profile.materialId())) continue;
 
             PlanKey key = PlanKey.single(profile.ecosystem(), profile.materialId());
             MaterialProfile.Ecosystem target = profile.ecosystem() == MaterialProfile.Ecosystem.SILENT_GEAR
@@ -52,7 +55,9 @@ public final class MaterialBridgePlanner {
                     canonicalPhysicalItem(snapshot, candidate, profile),
                     MaterialBridgePlan.Action.BRIDGE,
                     Optional.of(profile.ecosystem()), Optional.of(target),
-                    Optional.of(profile.materialId()), Optional.empty(), reason));
+                    Optional.of(profile.materialId()),
+                    Optional.of(GeneratedMaterialOwnership.idFor(target, profile.materialId())),
+                    reason));
         }
 
         List<MaterialBridgePlan> result = new ArrayList<>(plans.values());

@@ -30,6 +30,12 @@ public record MaterialBridgePlan(
         if (source.isPresent() != sourceMaterialId.isPresent()) {
             throw new IllegalArgumentException("source ecosystem and source material id must be present together");
         }
+        if (target.isPresent() != targetMaterialId.isPresent()) {
+            throw new IllegalArgumentException("target ecosystem and target material id must be present together");
+        }
+        if (action == Action.BRIDGE && (source.isEmpty() || target.isEmpty())) {
+            throw new IllegalArgumentException("Bridge plans require owned source and target identities");
+        }
     }
 
     public enum Action {

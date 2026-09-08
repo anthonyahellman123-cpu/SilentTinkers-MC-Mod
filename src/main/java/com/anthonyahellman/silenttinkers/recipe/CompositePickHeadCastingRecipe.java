@@ -26,6 +26,8 @@ import slimeknights.tconstruct.library.tools.part.IMaterialItem;
 import slimeknights.tconstruct.tools.TinkerToolParts;
 
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /** First real Tinkers part produced from a dynamic Silent Gear alloy. */
 public final class CompositePickHeadCastingRecipe extends AbstractCastingRecipe {
@@ -33,6 +35,7 @@ public final class CompositePickHeadCastingRecipe extends AbstractCastingRecipe 
     private static final int COST = 2 * FluidValues.INGOT;
     private static final TagKey<Item> PICK_HEAD_CASTS = TagKey.create(
             Registries.ITEM, new ResourceLocation("tconstruct", "casts/multi_use/pick_head"));
+    private static final Set<String> LOGGED_MISSING_STAT_PAYLOADS = ConcurrentHashMap.newKeySet();
 
     public CompositePickHeadCastingRecipe(ResourceLocation id) {
         super(TinkerRecipeTypes.CASTING_TABLE.get(), id, "silent_gear_alloys",
@@ -43,7 +46,7 @@ public final class CompositePickHeadCastingRecipe extends AbstractCastingRecipe 
     public boolean matches(ICastingContainer inventory, Level level) {
         return getCast().test(inventory.getStack())
                 && inventory.getFluid() == ModFluids.MOLTEN_COMPOSITE_ALLOY.get()
-                && AlloyPayload.read(inventory.getFluidTag()).isPresent();
+                && AlloyPayload.isToolCastReady(inventory.getFluidTag());
     }
 
     @Override
@@ -58,9 +61,20 @@ public final class CompositePickHeadCastingRecipe extends AbstractCastingRecipe 
 
     @Override
     public ItemStack assemble(ICastingContainer inventory, RegistryAccess access) {
+        Optional<AlloyStatSnapshot> sourceStats = AlloyPayload.readStats(inventory.getFluidTag());
+        if (sourceStats.isEmpty()) {
+            AlloyPayload.read(inventory.getFluidTag()).ifPresent(composition -> {
+                if (LOGGED_MISSING_STAT_PAYLOADS.add(composition.fingerprint())) {
+                    SilentTinkersMod.LOGGER.error(
+                            "[SilentTinkers:CAST_REFUSED_MISSING_STATS] composition={} -- real Tinkers parts require an evaluated stat snapshot",
+                            composition.fingerprint());
+                }
+            });
+            return ItemStack.EMPTY;
+        }
+
         return AlloyPayload.read(inventory.getFluidTag()).map(composition -> {
             int starChargeLevel = AlloyPayload.readStarChargeLevel(inventory.getFluidTag());
-            Optional<AlloyStatSnapshot> sourceStats = AlloyPayload.readStats(inventory.getFluidTag());
             Optional<SourceVisualIdentity> visualSource = AlloyPayload.readVisualSource(inventory.getFluidTag());
             String encoded = AlloyVariantCodec.encode(composition, starChargeLevel, sourceStats, visualSource);
             MaterialVariantId variant = MaterialVariantId.create(MATERIAL, encoded);
