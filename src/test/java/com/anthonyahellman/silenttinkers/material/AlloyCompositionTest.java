@@ -22,6 +22,29 @@ class AlloyCompositionTest {
     }
 
     @Test
+    void equalFourWayAlloyPreservesExactQuarterSharesAndStats() {
+        Map<ResourceLocation, Long> fourWay = new LinkedHashMap<>();
+        fourWay.put(id("silentgear:iron"), 25L);
+        fourWay.put(id("silentgear:redstone"), 25L);
+        fourWay.put(id("tinkers_advanced:antimony"), 25L);
+        fourWay.put(id("silentcompat:elementium"), 25L);
+
+        AlloyComposition original = AlloyComposition.of(fourWay);
+        AlloyStatSnapshot stats = new AlloyStatSnapshot(
+                2048.0f, 12.5f, 8.25f, 0.15f, id("minecraft:netherite"));
+        String encoded = AlloyVariantCodec.encode(original, 0, java.util.Optional.of(stats));
+        AlloyComposition restored = AlloyVariantCodec.decode(encoded);
+
+        assertEquals(4, restored.ingredients().size());
+        assertEquals(0.25, restored.fraction(id("silentgear:iron")), 0.000_001);
+        assertEquals(0.25, restored.fraction(id("silentgear:redstone")), 0.000_001);
+        assertEquals(0.25, restored.fraction(id("tinkers_advanced:antimony")), 0.000_001);
+        assertEquals(0.25, restored.fraction(id("silentcompat:elementium")), 0.000_001);
+        assertEquals(original.fingerprint(), restored.fingerprint());
+        assertEquals(stats, AlloyVariantCodec.decodeStats(encoded).orElseThrow());
+    }
+
+    @Test
     void nbtRoundTripPreservesCanonicalIdentity() {
         AlloyComposition original = AlloyComposition.of(alloy(7, 2, 1));
         AlloyComposition restored = AlloyComposition.load(original.save());
