@@ -1,0 +1,16 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.anthonyahellman.silenttinkers.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "ChargerInputSlotMixin",
+    "ChargerTileEntityMixin"
+  ],
+  "client": [
+    "CompositeMaterialRenderMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -1,11 +1,13 @@
 package com.anthonyahellman.silenttinkers.modifier;
 
-import com.anthonyahellman.silenttinkers.material.AlloyStatSnapshot;
-import com.anthonyahellman.silenttinkers.material.AlloyComposition;
-import com.anthonyahellman.silenttinkers.material.AlloyVariantCodec;
-import com.anthonyahellman.silenttinkers.material.MaterialIngredient;
+import com.anthonyahellman.silenttinkers.SilentTinkersMod;
 import com.anthonyahellman.silenttinkers.config.SilentTinkersConfig;
 import com.anthonyahellman.silenttinkers.config.TraitAccess;
+import com.anthonyahellman.silenttinkers.material.AlloyComposition;
+import com.anthonyahellman.silenttinkers.material.AlloyStatSnapshot;
+import com.anthonyahellman.silenttinkers.material.AlloyVariantCodec;
+import com.anthonyahellman.silenttinkers.material.MaterialIngredient;
+import com.anthonyahellman.silenttinkers.material.RuntimeBridgeHealth;
 import com.anthonyahellman.silenttinkers.recipe.CompositePickHeadCastingRecipe;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Tier;
@@ -18,8 +20,8 @@ import slimeknights.tconstruct.library.materials.definition.MaterialVariant;
 import slimeknights.tconstruct.library.modifiers.Modifier;
 import slimeknights.tconstruct.library.modifiers.ModifierEntry;
 import slimeknights.tconstruct.library.modifiers.ModifierHooks;
-import slimeknights.tconstruct.library.modifiers.hook.build.ToolStatsModifierHook;
 import slimeknights.tconstruct.library.modifiers.hook.build.ModifierTraitHook;
+import slimeknights.tconstruct.library.modifiers.hook.build.ToolStatsModifierHook;
 import slimeknights.tconstruct.library.module.ModuleHookMap;
 import slimeknights.tconstruct.library.tools.nbt.IToolContext;
 import slimeknights.tconstruct.library.tools.stat.ModifierStatsBuilder;
@@ -28,31 +30,29 @@ import slimeknights.tconstruct.tools.stats.HeadMaterialStats;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /** Replaces the composite head's placeholder contribution with Silent Gear's evaluated stats. */
 public final class CompositeAlloyModifier extends Modifier implements ToolStatsModifierHook, ModifierTraitHook {
     private static final float PLACEHOLDER_DURABILITY = 1.0f;
     private static final float PLACEHOLDER_MINING_SPEED = 1.0f;
     private static final float PLACEHOLDER_MELEE_DAMAGE = 1.0f;
-    private static final String ENCODED_VARIANT_PREFIX = "v1.";
+    private static final Set<String> LOGGED_STAT_VARIANTS = ConcurrentHashMap.newKeySet();
+    private static final Set<String> LOGGED_MISSING_STAT_VARIANTS = ConcurrentHashMap.newKeySet();
+    private static final Set<String> LOGGED_CONTEXTS_WITHOUT_COMPOSITE = ConcurrentHashMap.newKeySet();
+    private static final Set<ResourceLocation> LOGGED_UNKNOWN_TIERS = ConcurrentHashMap.newKeySet();
 
     @Override
     protected void registerHooks(ModuleHookMap.Builder hookBuilder) {
         hookBuilder.addHook(this, ModifierHooks.TOOL_STATS, ModifierHooks.MODIFIER_TRAITS);
     }
 
-    /**
-     * Adds the real registered Tinkers traits for alloy ingredients that also
-     * exist as Tinkers materials. This deliberately asks Tinkers' live material
-     * registry instead of copying trait names, so addon modifier behavior stays
-     * owned by the addon that registered it.
-     */
     @Override
     public void addTraits(IToolContext context, ModifierEntry modifier, TraitBuilder builder,
                           boolean firstEncounter) {
-        if (!firstEncounter) {
-            return;
-        }
+        if (!firstEncounter) return;
         IMaterialRegistry registry = MaterialRegistry.getInstance();
         for (MaterialVariant material : context.getMaterials()) {
             if (!material.getVariant().getId().equals(CompositePickHeadCastingRecipe.MATERIAL)) {
@@ -62,7 +62,7 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
             // TConstruct creates base/display material instances whose variant is just
             // "silenttinkers:composite_alloy". Those do not carry an alloy payload and
             // must not be fed to the v1 codec used by real cast composite parts.
-            if (!variant.startsWith(ENCODED_VARIANT_PREFIX)) {
+            if (!AlloyVariantCodec.isEncodedVariant(variant)) {
                 continue;
             }
             AlloyComposition composition;
@@ -74,9 +74,7 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
             for (MaterialIngredient ingredient : composition.ingredients()) {
                 TraitAccess access = SilentTinkersConfig.traitThresholds()
                         .accessFor(100.0 * ingredient.units() / composition.totalUnits());
-                if (access == TraitAccess.NONE) {
-                    continue;
-                }
+                if (access == TraitAccess.NONE) continue;
                 resolveTinkersMaterial(registry, ingredient.materialId()).ifPresent(materialId -> {
                     List<ModifierEntry> traits = registry.getTraits(materialId, HeadMaterialStats.ID);
                     int allowed = switch (access) {
@@ -91,51 +89,64 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
         }
     }
 
-    private static Optional<MaterialId> resolveTinkersMaterial(IMaterialRegistry registry,
-                                                                ResourceLocation sourceId) {
+    private static Optional<MaterialId> resolveTinkersMaterial(IMaterialRegistry registry, ResourceLocation sourceId) {
         MaterialId exact = new MaterialId(sourceId);
-        if (registry.getMaterial(exact) != IMaterial.UNKNOWN) {
-            return Optional.of(exact);
-        }
+        if (registry.getMaterial(exact) != IMaterial.UNKNOWN) return Optional.of(exact);
 
-        // Silent Gear's built-in IDs commonly use the silentgear namespace,
-        // while the equivalent Tinkers materials use tconstruct with the same path.
         MaterialId tconstruct = new MaterialId("tconstruct", sourceId.getPath());
-        if (registry.getMaterial(tconstruct) != IMaterial.UNKNOWN) {
-            return Optional.of(tconstruct);
-        }
+        if (registry.getMaterial(tconstruct) != IMaterial.UNKNOWN) return Optional.of(tconstruct);
 
-        // Cross-addon bridges often retain the material path but use their own
-        // namespace. Accept that handshake only when the path is unique, so a
-        // pack with two unrelated materials named alike never gets a random trait.
         List<MaterialId> samePath = registry.getAllMaterials().stream()
                 .map(IMaterial::getIdentifier)
                 .filter(id -> id.getPath().equals(sourceId.getPath()))
                 .distinct()
                 .toList();
-        if (samePath.size() == 1) {
-            return Optional.of(samePath.get(0));
-        }
-        return Optional.empty();
+        return samePath.size() == 1 ? Optional.of(samePath.get(0)) : Optional.empty();
     }
 
     @Override
     public void addToolStats(IToolContext context, ModifierEntry modifier, ModifierStatsBuilder builder) {
+        boolean foundComposite = false;
         for (MaterialVariant material : context.getMaterials()) {
             if (!material.getVariant().getId().equals(CompositePickHeadCastingRecipe.MATERIAL)) {
                 continue;
             }
+            foundComposite = true;
             String variant = material.getVariant().getVariant();
-            if (!variant.startsWith(ENCODED_VARIANT_PREFIX)) {
+            if (!AlloyVariantCodec.isEncodedVariant(variant)) {
                 continue;
             }
             Optional<AlloyStatSnapshot> decoded;
             try {
                 decoded = AlloyVariantCodec.decodeStats(variant);
             } catch (IllegalArgumentException exception) {
+                SilentTinkersMod.LOGGER.warn("[SilentTinkers:COMPOSITE_STATS_DECODE_FAILED] variant={}", material.getVariant(), exception);
                 continue;
             }
-            decoded.ifPresent(stats -> apply(stats, builder));
+            if (decoded.isEmpty()) {
+                String variantKey = material.getVariant().toString();
+                if (LOGGED_MISSING_STAT_VARIANTS.add(variantKey)) {
+                    SilentTinkersMod.LOGGER.warn("[SilentTinkers:COMPOSITE_STATS_MISSING] variant={} -- composite material reached tool construction without encoded stats", material.getVariant());
+                }
+                continue;
+            }
+            AlloyStatSnapshot stats = decoded.orElseThrow();
+            apply(stats, builder);
+            RuntimeBridgeHealth.markCompositeStatsApplied();
+            String variantKey = material.getVariant().toString();
+            if (LOGGED_STAT_VARIANTS.add(variantKey)) {
+                SilentTinkersMod.LOGGER.info("[SilentTinkers:COMPOSITE_STATS_APPLIED] variant={} durability={} miningSpeed={} meleeDamage={} attackSpeed={} tier={}",
+                        material.getVariant(), stats.durability(), stats.miningSpeed(), stats.meleeDamage(), stats.attackSpeed(), stats.harvestTier());
+            }
+        }
+
+        if (!foundComposite) {
+            String materials = context.getMaterials().getList().stream()
+                    .map(material -> material.getVariant().toString())
+                    .collect(Collectors.joining(","));
+            if (LOGGED_CONTEXTS_WITHOUT_COMPOSITE.add(materials)) {
+                SilentTinkersMod.LOGGER.warn("[SilentTinkers:COMPOSITE_MODIFIER_WITHOUT_MATERIAL] materials=[{}] -- modifier ran but composite material variant is absent", materials);
+            }
         }
     }
 
@@ -148,6 +159,8 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
         Tier tier = TierSortingRegistry.byName(stats.harvestTier());
         if (tier != null) {
             ToolStats.HARVEST_TIER.update(builder, tier);
+        } else if (LOGGED_UNKNOWN_TIERS.add(stats.harvestTier())) {
+            SilentTinkersMod.LOGGER.warn("[SilentTinkers:COMPOSITE_TIER_UNKNOWN] tier={} -- falling back to the tool's existing harvest tier", stats.harvestTier());
         }
     }
 }

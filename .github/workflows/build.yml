@@ -2,7 +2,7 @@ name: Build Silent Tinkers
 
 on:
   push:
-    branches: [main]
+    branches: [main, unified-material-registry]
   pull_request:
   workflow_dispatch:
 

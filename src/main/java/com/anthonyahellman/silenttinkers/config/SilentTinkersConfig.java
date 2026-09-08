@@ -7,22 +7,17 @@ public final class SilentTinkersConfig {
     private static final ForgeConfigSpec.DoubleValue PRIMARY_TRAIT_PERCENT;
     private static final ForgeConfigSpec.DoubleValue SECONDARY_TRAIT_PERCENT;
     private static final ForgeConfigSpec.DoubleValue FULL_TRAIT_PERCENT;
+    private static final ForgeConfigSpec.DoubleValue DURABILITY_TRANSLATION_PERCENT;
+    private static final ForgeConfigSpec.DoubleValue MINING_SPEED_TRANSLATION_PERCENT;
+    private static final ForgeConfigSpec.DoubleValue MELEE_DAMAGE_TRANSLATION_PERCENT;
+    private static final ForgeConfigSpec.DoubleValue ATTACK_SPEED_TRANSLATION_PERCENT;
 
     static {
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
         builder.comment(
                 "Controls how much of a material must be present in a composite alloy",
                 "before that material contributes its native Tinkers traits.",
-                "Numeric stat weighting is independent of these trait gates.",
-                "",
-                "Examples using the defaults:",
-                "  10% material: numeric stats only",
-                "  33% material: primary traits",
-                "  60% material: primary and secondary traits",
-                "  80% material: complete native trait package",
-                "",
-                "Set all three values to 0 to grant every present material its full package.",
-                "Set all three values to 100 to require a pure material for any traits.")
+                "Numeric stat weighting is independent of these trait gates.")
                 .push("traits");
 
         PRIMARY_TRAIT_PERCENT = builder
@@ -34,8 +29,19 @@ public final class SilentTinkersConfig {
         FULL_TRAIT_PERCENT = builder
                 .comment("Minimum material percentage required for its complete trait package. Range: 0-100.")
                 .defineInRange("fullTraitPercent", 75.0, 0.0, 100.0);
-
         builder.pop();
+
+        builder.comment(
+                "Global numeric translation percentages used when SilentTinkers bridges a material.",
+                "100 preserves the source ecosystem's evaluated value; 80 carries 80% of it.",
+                "These are server-side balance controls and do not affect native materials that already have compatibility.")
+                .push("translation");
+        DURABILITY_TRANSLATION_PERCENT = builder.defineInRange("durabilityPercent", 100.0, 0.0, 500.0);
+        MINING_SPEED_TRANSLATION_PERCENT = builder.defineInRange("miningSpeedPercent", 100.0, 0.0, 500.0);
+        MELEE_DAMAGE_TRANSLATION_PERCENT = builder.defineInRange("meleeDamagePercent", 100.0, 0.0, 500.0);
+        ATTACK_SPEED_TRANSLATION_PERCENT = builder.defineInRange("attackSpeedPercent", 100.0, 0.0, 500.0);
+        builder.pop();
+
         SPEC = builder.build();
     }
 
@@ -45,11 +51,36 @@ public final class SilentTinkersConfig {
         double primary = PRIMARY_TRAIT_PERCENT.get();
         double secondary = SECONDARY_TRAIT_PERCENT.get();
         double full = FULL_TRAIT_PERCENT.get();
-        // Keep the server bootable if a user manually enters thresholds out of
-        // order. Sorting preserves all three chosen values and makes behavior deterministic.
         double low = Math.min(primary, Math.min(secondary, full));
         double high = Math.max(primary, Math.max(secondary, full));
         double middle = primary + secondary + full - low - high;
         return new TraitThresholds(low, middle, high);
+    }
+
+    public static TranslationPercentages translationPercentages() {
+        return new TranslationPercentages(
+                DURABILITY_TRANSLATION_PERCENT.get(),
+                MINING_SPEED_TRANSLATION_PERCENT.get(),
+                MELEE_DAMAGE_TRANSLATION_PERCENT.get(),
+                ATTACK_SPEED_TRANSLATION_PERCENT.get());
+    }
+
+    public record TranslationPercentages(
+            double durability,
+            double miningSpeed,
+            double meleeDamage,
+            double attackSpeed) {
+        public TranslationPercentages {
+            requireFiniteNonNegative(durability, "durability");
+            requireFiniteNonNegative(miningSpeed, "miningSpeed");
+            requireFiniteNonNegative(meleeDamage, "meleeDamage");
+            requireFiniteNonNegative(attackSpeed, "attackSpeed");
+        }
+
+        private static void requireFiniteNonNegative(double value, String name) {
+            if (!Double.isFinite(value) || value < 0.0) {
+                throw new IllegalArgumentException(name + " translation percentage must be finite and non-negative");
+            }
+        }
     }
 }
