@@ -27,6 +27,11 @@ public final class MaterialGenerationEvaluator {
         if (source == MaterialProfile.Ecosystem.SILENT_GEAR) {
             Optional<TranslatedMaterialStats> translated = MaterialStatTranslator.translate(request);
             if (translated.isEmpty()) return quarantined(request, "Silent Gear source stats could not be translated");
+            HeadMaterialEligibility.Result eligibility = HeadMaterialEligibility.evaluate(translated.orElseThrow());
+            if (!eligibility.eligible()) {
+                return quarantined(request, "Silent Gear source is not eligible as a Tinkers head: "
+                        + eligibility.detail());
+            }
             return new MaterialGenerationEvaluation(request,
                     MaterialGenerationEvaluation.Status.READY_FOR_TINKERS,
                     translated, Optional.empty(), "Silent Gear source evaluated and translated");

@@ -28,9 +28,10 @@ public final class TraitForwardingPlan {
         for (MaterialIngredient ingredient : composition.ingredients()) {
             double percent = 100.0 * ingredient.units() / composition.totalUnits();
             TraitAccess access = thresholds.accessFor(percent);
+            int contributionLevel = TraitContributionLevel.forPercent(percent, thresholds);
             if (access == TraitAccess.NONE) {
                 decisions.add(new Decision<>(ingredient.materialId(), percent, access,
-                        Optional.empty(), 0, List.of()));
+                        contributionLevel, Optional.empty(), 0, List.of()));
                 continue;
             }
 
@@ -38,14 +39,14 @@ public final class TraitForwardingPlan {
                     resolver.apply(ingredient.materialId()), "resolution");
             if (!resolution.resolved()) {
                 decisions.add(new Decision<>(ingredient.materialId(), percent, access,
-                        Optional.of(resolution), 0, List.of()));
+                        contributionLevel, Optional.of(resolution), 0, List.of()));
                 continue;
             }
 
             List<T> available = List.copyOf(Objects.requireNonNull(
                     traitLookup.apply(resolution.materialId().orElseThrow()), "traits"));
             decisions.add(new Decision<>(ingredient.materialId(), percent, access,
-                    Optional.of(resolution), available.size(), select(access, available)));
+                    contributionLevel, Optional.of(resolution), available.size(), select(access, available)));
         }
         return List.copyOf(decisions);
     }
@@ -66,12 +67,16 @@ public final class TraitForwardingPlan {
     public record Decision<T>(ResourceLocation sourceMaterialId,
                               double materialPercent,
                               TraitAccess access,
+                              int contributionLevel,
                               Optional<TraitSourceResolver.Resolution> resolution,
                               int availableTraitCount,
                               List<T> forwardedTraits) {
         public Decision {
             Objects.requireNonNull(sourceMaterialId, "sourceMaterialId");
             Objects.requireNonNull(access, "access");
+            if (contributionLevel < 0 || contributionLevel > 4) {
+                throw new IllegalArgumentException("contributionLevel must be from 0 to 4");
+            }
             resolution = Objects.requireNonNull(resolution, "resolution");
             forwardedTraits = List.copyOf(forwardedTraits);
             if (availableTraitCount < 0 || forwardedTraits.size() > availableTraitCount) {

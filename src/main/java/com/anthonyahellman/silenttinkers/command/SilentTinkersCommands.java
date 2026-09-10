@@ -8,6 +8,7 @@ import com.anthonyahellman.silenttinkers.material.MaterialPlanFingerprint;
 import com.anthonyahellman.silenttinkers.material.RuntimeBridgeHealth;
 import com.anthonyahellman.silenttinkers.material.StarChargeBridgeHealth;
 import com.anthonyahellman.silenttinkers.material.TranslatedMaterialStats;
+import com.anthonyahellman.silenttinkers.material.TraitAdapterPlan;
 import com.anthonyahellman.silenttinkers.material.UnifiedMaterialDiscovery;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
@@ -70,6 +71,9 @@ public final class SilentTinkersCommands {
                         + " | secondary " + traitThresholds.secondaryPercent() + "%"
                         + " | full " + traitThresholds.fullPercent() + "%"), false);
         source.sendSuccess(() -> Component.literal(
+                "SG trait catalog: " + snapshot.silentGear().traitBearingMaterials()
+                        + " materials | " + snapshot.silentGear().traitReferences() + " trait references"), false);
+        source.sendSuccess(() -> Component.literal(
                 "Composite hook " + CompositeBridgeHealth.status()
                         + " | assembled-tool stats "
                         + (RuntimeBridgeHealth.compositeStatsApplied() ? "VALIDATED THIS SESSION" : "NOT YET OBSERVED")), false);
@@ -112,6 +116,14 @@ public final class SilentTinkersCommands {
                             + " | target " + request.target().map(Enum::name).orElse("BOTH")), false);
             if (!evaluation.detail().isBlank()) source.sendSuccess(() -> Component.literal("Detail: " + evaluation.detail()), false);
             evaluation.translatedStats().ifPresent(stats -> sendTranslatedStats(source, stats));
+            request.sourceMaterialId().ifPresent(materialId -> {
+                List<ResourceLocation> traits = MaterialDiscoveryState.silentGearTraits(materialId);
+                if (!traits.isEmpty()) {
+                    source.sendSuccess(() -> Component.literal("Silent Gear traits: " + traits), false);
+                    List<TraitAdapterPlan.Decision> adapters = TraitAdapterPlan.create(traits, 4);
+                    source.sendSuccess(() -> Component.literal("100% trait adapters: " + adapters), false);
+                }
+            });
         }
 
         boolean runtimeReady = MaterialDiscoveryState.readyForTinkers(itemId).isPresent();

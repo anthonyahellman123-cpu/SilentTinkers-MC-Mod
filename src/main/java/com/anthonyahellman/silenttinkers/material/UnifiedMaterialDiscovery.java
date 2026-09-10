@@ -38,6 +38,9 @@ public final class UnifiedMaterialDiscovery {
         SilentTinkersMod.LOGGER.info("Material discovery: SG={} materials/{} aliases, TCon={} materials/{} aliases, correlated={}, bridgeCandidates={}, ambiguous={}",
                 silentGear.materials(), silentGear.physicalAliases(), tinkers.materials(), tinkers.physicalAliases(),
                 correlated.size(), bridgeCandidates.size(), ambiguous.size());
+        SilentTinkersMod.LOGGER.info(
+                "[SilentTinkers:SG_TRAIT_CATALOG] materialsWithTraits={} traitReferences={} -- unsupported traits remain non-blocking until an adapter is available",
+                silentGear.traitBearingMaterials(), silentGear.traitReferences());
 
         for (MaterialCorrelationIndex.Candidate candidate : ambiguous) {
             SilentTinkersMod.LOGGER.warn("[SilentTinkers:AMBIGUOUS] item={} claims={} -- quarantined from generation",

@@ -27,9 +27,13 @@ public final class SilentGearDiscoveryBridge {
         int materials = 0;
         int aliases = 0;
         int unresolved = 0;
+        int traitBearingMaterials = 0;
+        int traitReferences = 0;
 
         for (Entry entry : provider.discover()) {
             materials++;
+            if (!entry.traitIds().isEmpty()) traitBearingMaterials++;
+            traitReferences += entry.traitIds().size();
             if (entry.physicalItems().isEmpty()) {
                 unresolved++;
                 continue;
@@ -43,7 +47,7 @@ public final class SilentGearDiscoveryBridge {
             aliases += entry.physicalItems().size();
         }
 
-        return new DiscoveryReport(materials, aliases, unresolved);
+        return new DiscoveryReport(materials, aliases, unresolved, traitBearingMaterials, traitReferences);
     }
 
     /** Implemented by the SG-specific runtime adapter once its API is available. */
@@ -63,5 +67,10 @@ public final class SilentGearDiscoveryBridge {
         }
     }
 
-    public record DiscoveryReport(int materials, int physicalAliases, int unresolvedMaterials) {}
+    public record DiscoveryReport(int materials, int physicalAliases, int unresolvedMaterials,
+                                  int traitBearingMaterials, int traitReferences) {
+        public DiscoveryReport(int materials, int physicalAliases, int unresolvedMaterials) {
+            this(materials, physicalAliases, unresolvedMaterials, 0, 0);
+        }
+    }
 }

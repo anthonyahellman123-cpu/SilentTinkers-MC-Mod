@@ -5,6 +5,7 @@ import net.minecraft.resources.ResourceLocation;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -23,12 +24,23 @@ public final class MaterialDiscoveryState {
             new AtomicReference<>();
     private static final AtomicReference<Map<ResourceLocation, MaterialGenerationEvaluation>> READY_FOR_TINKERS =
             new AtomicReference<>(Map.of());
+    private static final AtomicReference<Map<ResourceLocation, List<ResourceLocation>>> SILENT_GEAR_TRAITS =
+            new AtomicReference<>(Map.of());
 
     private MaterialDiscoveryState() {}
 
     public static synchronized void publish(UnifiedMaterialDiscovery.Snapshot snapshot) {
         Map<ResourceLocation, MaterialGenerationEvaluation> ready = new LinkedHashMap<>();
+        Map<ResourceLocation, LinkedHashSet<ResourceLocation>> silentGearTraits = new LinkedHashMap<>();
         Set<ResourceLocation> duplicates = new LinkedHashSet<>();
+
+        for (MaterialCorrelationIndex.Candidate candidate : snapshot.index().all()) {
+            MaterialProfile profile = candidate.profiles().get(MaterialProfile.Ecosystem.SILENT_GEAR);
+            if (profile != null) {
+                silentGearTraits.computeIfAbsent(profile.materialId(), ignored -> new LinkedHashSet<>())
+                        .addAll(profile.traits());
+            }
+        }
 
         for (MaterialGenerationEvaluation evaluation : snapshot.evaluations()) {
             if (!evaluation.readyForMutation()) continue;
@@ -53,6 +65,9 @@ public final class MaterialDiscoveryState {
         }
 
         READY_FOR_TINKERS.set(Map.copyOf(ready));
+        Map<ResourceLocation, List<ResourceLocation>> immutableTraits = new LinkedHashMap<>();
+        silentGearTraits.forEach((material, traits) -> immutableTraits.put(material, List.copyOf(traits)));
+        SILENT_GEAR_TRAITS.set(Map.copyOf(immutableTraits));
         CURRENT.set(snapshot);
     }
 
@@ -68,8 +83,13 @@ public final class MaterialDiscoveryState {
         return READY_FOR_TINKERS.get().size();
     }
 
+    public static List<ResourceLocation> silentGearTraits(ResourceLocation materialId) {
+        return SILENT_GEAR_TRAITS.get().getOrDefault(materialId, List.of());
+    }
+
     public static synchronized void clear() {
         READY_FOR_TINKERS.set(Map.of());
+        SILENT_GEAR_TRAITS.set(Map.of());
         CURRENT.set(null);
     }
 }

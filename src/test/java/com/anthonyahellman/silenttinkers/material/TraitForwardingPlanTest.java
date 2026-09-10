@@ -48,6 +48,7 @@ final class TraitForwardingPlanTest {
         for (TraitForwardingPlan.Decision<TraitToken> decision : decisions) {
             assertEquals(25.0, decision.materialPercent(), 0.000_001);
             assertEquals(TraitAccess.PRIMARY, decision.access());
+            assertEquals(1, decision.contributionLevel());
             assertEquals(3, decision.availableTraitCount());
             assertEquals(1, decision.forwardedTraits().size());
             assertEquals(decision.sourceMaterialId().getPath(),

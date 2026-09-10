@@ -5,7 +5,9 @@ import com.anthonyahellman.silenttinkers.config.SilentTinkersConfig;
 import com.anthonyahellman.silenttinkers.material.AlloyComposition;
 import com.anthonyahellman.silenttinkers.material.AlloyStatSnapshot;
 import com.anthonyahellman.silenttinkers.material.AlloyVariantCodec;
+import com.anthonyahellman.silenttinkers.material.MaterialDiscoveryState;
 import com.anthonyahellman.silenttinkers.material.RuntimeBridgeHealth;
+import com.anthonyahellman.silenttinkers.material.TraitAdapterPlan;
 import com.anthonyahellman.silenttinkers.material.TraitForwardingPlan;
 import com.anthonyahellman.silenttinkers.material.TraitSourceResolver;
 import com.anthonyahellman.silenttinkers.recipe.CompositePickHeadCastingRecipe;
@@ -19,6 +21,7 @@ import slimeknights.tconstruct.library.materials.definition.MaterialId;
 import slimeknights.tconstruct.library.materials.definition.MaterialVariant;
 import slimeknights.tconstruct.library.modifiers.Modifier;
 import slimeknights.tconstruct.library.modifiers.ModifierEntry;
+import slimeknights.tconstruct.library.modifiers.ModifierId;
 import slimeknights.tconstruct.library.modifiers.ModifierHooks;
 import slimeknights.tconstruct.library.modifiers.hook.build.ModifierTraitHook;
 import slimeknights.tconstruct.library.modifiers.hook.build.ToolStatsModifierHook;
@@ -45,6 +48,7 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
     private static final Set<String> LOGGED_CONTEXTS_WITHOUT_COMPOSITE = ConcurrentHashMap.newKeySet();
     private static final Set<String> LOGGED_TRAIT_DECISIONS = ConcurrentHashMap.newKeySet();
     private static final Set<String> LOGGED_UNRESOLVED_TRAIT_SOURCES = ConcurrentHashMap.newKeySet();
+    private static final Set<String> LOGGED_TRAIT_ADAPTERS = ConcurrentHashMap.newKeySet();
     private static final Set<ResourceLocation> LOGGED_UNKNOWN_TIERS = ConcurrentHashMap.newKeySet();
 
     @Override
@@ -96,10 +100,57 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
                                 decision.access(), resolution.orElseThrow().status(),
                                 resolution.orElseThrow().candidates());
                     }
-                    continue;
+                } else {
+                    // Registry-provided material traits retain their declared ModifierEntry levels.
+                    // Composition-derived levels apply to Silent Gear adapters below, so this path
+                    // does not flatten legitimate addon modifier semantics.
+                    decision.forwardedTraits().forEach(builder::add);
                 }
 
-                decision.forwardedTraits().forEach(builder::add);
+                Set<ModifierId> nativeModifierIds = decision.forwardedTraits().stream()
+                        .map(ModifierEntry::getId)
+                        .collect(Collectors.toSet());
+                for (TraitAdapterPlan.Decision adapter : TraitAdapterPlan.create(
+                        MaterialDiscoveryState.silentGearTraits(decision.sourceMaterialId()),
+                        decision.contributionLevel())) {
+                    String adapterKey = decisionKey + "|" + adapter.sourceTrait();
+                    if (adapter.status() != TraitAdapterPlan.Status.SUPPORTED) {
+                        if (adapter.status() == TraitAdapterPlan.Status.UNSUPPORTED
+                                && LOGGED_TRAIT_ADAPTERS.add(adapterKey)) {
+                            SilentTinkersMod.LOGGER.info(
+                                    "[SilentTinkers:TRAIT_ADAPTER_UNSUPPORTED] composite={} source={} trait={} percent={} level={} reason={} -- material remains usable",
+                                    composition.fingerprint(), decision.sourceMaterialId(), adapter.sourceTrait(),
+                                    decision.materialPercent(), adapter.contributionLevel(), adapter.detail());
+                        }
+                        continue;
+                    }
+
+                    ModifierEntry adapted = new ModifierEntry(
+                            new ModifierId(adapter.targetModifier().orElseThrow()), adapter.contributionLevel());
+                    if (nativeModifierIds.contains(adapted.getId())) {
+                        if (LOGGED_TRAIT_ADAPTERS.add(adapterKey)) {
+                            SilentTinkersMod.LOGGER.info(
+                                    "[SilentTinkers:TRAIT_ADAPTER_DUPLICATE] composite={} source={} trait={} target={} -- native material trait retained without duplicate application",
+                                    composition.fingerprint(), decision.sourceMaterialId(), adapter.sourceTrait(), adapted.getId());
+                        }
+                        continue;
+                    }
+                    if (!adapted.isBound()) {
+                        if (LOGGED_TRAIT_ADAPTERS.add(adapterKey)) {
+                            SilentTinkersMod.LOGGER.warn(
+                                    "[SilentTinkers:TRAIT_ADAPTER_UNAVAILABLE] composite={} source={} trait={} target={} -- material remains usable",
+                                    composition.fingerprint(), decision.sourceMaterialId(), adapter.sourceTrait(), adapted.getId());
+                        }
+                        continue;
+                    }
+                    builder.add(adapted);
+                    if (LOGGED_TRAIT_ADAPTERS.add(adapterKey)) {
+                        SilentTinkersMod.LOGGER.info(
+                                "[SilentTinkers:TRAIT_ADAPTER_FORWARD] composite={} source={} trait={} target={} percent={} level={}",
+                                composition.fingerprint(), decision.sourceMaterialId(), adapter.sourceTrait(), adapted.getId(),
+                                decision.materialPercent(), adapter.contributionLevel());
+                    }
+                }
 
                 if (LOGGED_TRAIT_DECISIONS.add(decisionKey)) {
                     String resolved = resolution.flatMap(TraitSourceResolver.Resolution::materialId)
@@ -107,9 +158,9 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
                     String resolutionMode = resolution.map(value -> value.status().name())
                             .orElse("NOT_ELIGIBLE");
                     SilentTinkersMod.LOGGER.info(
-                            "[SilentTinkers:TRAIT_FORWARD] composite={} source={} resolved={} resolution={} percent={} access={} available={} forwarded={}",
+                            "[SilentTinkers:TRAIT_FORWARD] composite={} source={} resolved={} resolution={} percent={} access={} level={} available={} forwarded={}",
                             composition.fingerprint(), decision.sourceMaterialId(), resolved, resolutionMode,
-                            decision.materialPercent(), decision.access(), decision.availableTraitCount(),
+                            decision.materialPercent(), decision.access(), decision.contributionLevel(), decision.availableTraitCount(),
                             decision.forwardedTraits().size());
                 }
             }
