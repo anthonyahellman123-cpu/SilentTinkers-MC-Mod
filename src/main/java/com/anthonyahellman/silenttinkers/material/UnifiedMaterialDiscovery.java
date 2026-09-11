@@ -1,0 +1,172 @@
+package com.anthonyahellman.silenttinkers.material;
+
+import com.anthonyahellman.silenttinkers.SilentTinkersMod;
+import com.anthonyahellman.silenttinkers.compat.silentgear.SilentGearApiProvider;
+import com.anthonyahellman.silenttinkers.compat.silentgear.SilentGearDiscoveryBridge;
+import com.anthonyahellman.silenttinkers.compat.tconstruct.TinkersCorrelationAdapter;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+
+/** Builds one correlation snapshot from both loaded material ecosystems. */
+public final class UnifiedMaterialDiscovery {
+    private UnifiedMaterialDiscovery() {}
+
+    public static Snapshot discover() {
+        MaterialCorrelationIndex index = new MaterialCorrelationIndex();
+        SilentGearDiscoveryBridge.DiscoveryReport silentGear = SilentGearDiscoveryBridge.populate(index, new SilentGearApiProvider());
+        TinkersCorrelationAdapter.DiscoveryReport tinkers = TinkersCorrelationAdapter.populate(index);
+
+        List<MaterialCorrelationIndex.Candidate> correlated = new ArrayList<>();
+        List<MaterialCorrelationIndex.Candidate> bridgeCandidates = new ArrayList<>();
+        List<MaterialCorrelationIndex.Candidate> ambiguous = new ArrayList<>();
+        for (MaterialCorrelationIndex.Candidate candidate : index.all()) {
+            if (candidate.ambiguous()) ambiguous.add(candidate);
+            else if (candidate.correlated()) correlated.add(candidate);
+            else if (candidate.bridgeCandidate()) bridgeCandidates.add(candidate);
+        }
+
+        Comparator<MaterialCorrelationIndex.Candidate> byItem = Comparator.comparing(candidate -> candidate.physicalItem().toString());
+        correlated.sort(byItem);
+        bridgeCandidates.sort(byItem);
+        ambiguous.sort(byItem);
+
+        Snapshot planningSnapshot = new Snapshot(index, silentGear, tinkers,
+                List.copyOf(correlated), List.copyOf(bridgeCandidates), List.of());
+
+        SilentTinkersMod.LOGGER.info("Material discovery: SG={} materials/{} aliases, TCon={} materials/{} aliases, correlated={}, bridgeCandidates={}, ambiguous={}",
+                silentGear.materials(), silentGear.physicalAliases(), tinkers.materials(), tinkers.physicalAliases(),
+                correlated.size(), bridgeCandidates.size(), ambiguous.size());
+        SilentTinkersMod.LOGGER.info(
+                "[SilentTinkers:SG_TRAIT_CATALOG] materialsWithTraits={} traitReferences={} -- unsupported traits remain non-blocking until an adapter is available",
+                silentGear.traitBearingMaterials(), silentGear.traitReferences());
+
+        for (MaterialCorrelationIndex.Candidate candidate : ambiguous) {
+            SilentTinkersMod.LOGGER.warn("[SilentTinkers:AMBIGUOUS] item={} claims={} -- quarantined from generation",
+                    candidate.physicalItem(), candidate.claimIds());
+        }
+
+        List<MaterialGenerationRequest> requests = MaterialGenerationPlanner.fromDiscovery(planningSnapshot);
+        long actionable = requests.stream().filter(MaterialGenerationRequest::generatesAnything).count();
+        SilentTinkersMod.LOGGER.info("[SilentTinkers:GENERATION_PLAN] total={} actionable={} preserved={} aliasQuarantined={}",
+                requests.size(), actionable, requests.size() - actionable, ambiguous.size());
+
+        int readyForTinkers = 0;
+        int tinkersSourceReady = 0;
+        int roleLimited = 0;
+        int bootstrapPending = 0;
+        int requestQuarantined = 0;
+        int preserved = 0;
+        List<MaterialGenerationEvaluation> evaluations = new ArrayList<>(requests.size());
+
+        for (MaterialGenerationRequest request : requests) {
+            MaterialGenerationEvaluation evaluation = MaterialGenerationEvaluator.evaluate(request);
+            evaluations.add(evaluation);
+            if (evaluation.status() == MaterialGenerationEvaluation.Status.PRESERVED) {
+                preserved++;
+                continue;
+            }
+
+            SilentTinkersMod.LOGGER.info(
+                    "[SilentTinkers:EVALUATE] item={} action={} source={} sourceMaterial={} target={} status={} detail={}",
+                    request.physicalItem(), request.action(), request.source().map(Enum::name).orElse("NONE"),
+                    request.sourceMaterialId().map(Object::toString).orElse("NONE"),
+                    request.target().map(Enum::name).orElse("BOTH"), evaluation.status(), evaluation.detail());
+
+            switch (evaluation.status()) {
+                case READY_FOR_TINKERS -> {
+                    readyForTinkers++;
+                    TranslatedMaterialStats value = evaluation.translatedStats().orElseThrow();
+                    SilentTinkersMod.LOGGER.info(
+                            "[SilentTinkers:TRANSLATED] item={} durability={} miningSpeed={} meleeDamage={} attackSpeed={} tier={}",
+                            request.physicalItem(), value.durability(), value.miningSpeed(), value.meleeDamage(),
+                            value.attackSpeed(), value.harvestTier());
+                }
+                case TINKERS_SOURCE_READY -> {
+                    tinkersSourceReady++;
+                    var value = evaluation.tinkersSourceStats().orElseThrow();
+                    SilentTinkersMod.LOGGER.info(
+                            "[SilentTinkers:TINKERS_NATIVE] item={} headDurability={} miningSpeed={} meleeAttack={} tier={} handleDurability={} handleMiningSpeed={} handleAttackSpeed={} handleDamage={}",
+                            request.physicalItem(), value.headDurability(), value.headMiningSpeed(), value.headMeleeAttack(),
+                            value.harvestTier(), value.handleDurabilityModifier(), value.handleMiningSpeedModifier(),
+                            value.handleAttackSpeedModifier(), value.handleDamageModifier());
+                }
+                case ROLE_LIMITED -> {
+                    roleLimited++;
+                    SilentTinkersMod.LOGGER.info(
+                            "[SilentTinkers:PRIORITY_MATERIAL_ROLE_LIMITED] item={} sourceMaterial={} reason={}",
+                            request.physicalItem(), request.sourceMaterialId().map(Object::toString).orElse("NONE"),
+                            evaluation.detail());
+                }
+                case BOOTSTRAP_PENDING -> bootstrapPending++;
+                case QUARANTINED -> {
+                    requestQuarantined++;
+                    SilentTinkersMod.LOGGER.warn("[SilentTinkers:REQUEST_QUARANTINED] item={} reason={}",
+                            request.physicalItem(), evaluation.detail());
+                }
+                case PRESERVED -> { }
+            }
+        }
+
+        SilentTinkersMod.LOGGER.info(
+                "[SilentTinkers:EVALUATION_PLAN] readyForTinkers={} tinkersSourceReady={} roleLimited={} bootstrapPending={} requestQuarantined={} aliasQuarantined={}",
+                readyForTinkers, tinkersSourceReady, roleLimited, bootstrapPending, requestQuarantined, ambiguous.size());
+
+        PriorityMaterialAudit.Report priorityAudit = PriorityMaterialAudit.evaluate(evaluations);
+        for (PriorityMaterialAudit.PriorityEcosystem ecosystem : PriorityMaterialAudit.PriorityEcosystem.values()) {
+            for (PriorityMaterialAudit.Coverage coverage : PriorityMaterialAudit.Coverage.values()) {
+                int count = priorityAudit.count(ecosystem, coverage);
+                if (count > 0) {
+                    SilentTinkersMod.LOGGER.info("[SilentTinkers:PRIORITY_MATERIAL_{}] ecosystem={} materials={}",
+                            coverage, ecosystem, count);
+                }
+            }
+        }
+
+        Snapshot completedSnapshot = new Snapshot(index, silentGear, tinkers,
+                List.copyOf(correlated), List.copyOf(bridgeCandidates), List.copyOf(evaluations));
+        MaterialDiscoveryState.publish(completedSnapshot);
+        int runtimeReady = MaterialDiscoveryState.readyForTinkersCount();
+        long deferredPhysicalForm = Math.max(0L, completedSnapshot.readyForMutationCount() - runtimeReady);
+        String planFingerprint = MaterialPlanFingerprint.of(completedSnapshot);
+        SilentTinkersMod.LOGGER.info(
+                "[SilentTinkers:RUNTIME_INDEX] dynamicTinkersMaterials={} deferredPhysicalForm={} -- eligible materials use tagged-fluid casting",
+                runtimeReady, deferredPhysicalForm);
+        logStartupSummary(silentGear, tinkers, preserved, readyForTinkers, runtimeReady,
+                deferredPhysicalForm, tinkersSourceReady, bootstrapPending,
+                requestQuarantined, ambiguous.size(), planFingerprint);
+        return completedSnapshot;
+    }
+
+    private static void logStartupSummary(SilentGearDiscoveryBridge.DiscoveryReport silentGear,
+                                          TinkersCorrelationAdapter.DiscoveryReport tinkers,
+                                          int preserved,
+                                          int readyForTinkers,
+                                          int runtimeReady,
+                                          long deferredPhysicalForm,
+                                          int tinkersSourceReady,
+                                          int bootstrapPending,
+                                          int requestQuarantined,
+                                          int aliasQuarantined,
+                                          String planFingerprint) {
+        int quarantined = requestQuarantined + aliasQuarantined;
+        SilentTinkersMod.LOGGER.info(
+                "[SilentTinkers:STARTUP_SUMMARY] plan={} SG={} TCon={} preserved={} bridgeToTinkers={} runtimeReady={} deferredPhysicalForm={} tinkersSourceReady={} bootstrapPending={} quarantined={} status=SCAN_READY",
+                planFingerprint, silentGear.materials(), tinkers.materials(), preserved, readyForTinkers, runtimeReady,
+                deferredPhysicalForm, tinkersSourceReady, bootstrapPending, quarantined);
+    }
+
+    public record Snapshot(MaterialCorrelationIndex index,
+            SilentGearDiscoveryBridge.DiscoveryReport silentGear,
+            TinkersCorrelationAdapter.DiscoveryReport tinkers,
+            List<MaterialCorrelationIndex.Candidate> correlated,
+            List<MaterialCorrelationIndex.Candidate> bridgeCandidates,
+            List<MaterialGenerationEvaluation> evaluations) {
+        public int correlatedPhysicalItems() { return correlated.size(); }
+        public int bridgeCandidateCount() { return bridgeCandidates.size(); }
+        public long readyForMutationCount() {
+            return evaluations.stream().filter(MaterialGenerationEvaluation::readyForMutation).count();
+        }
+    }
+}

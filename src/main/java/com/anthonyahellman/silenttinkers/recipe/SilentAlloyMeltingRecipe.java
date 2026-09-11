@@ -1,8 +1,12 @@
 package com.anthonyahellman.silenttinkers.recipe;
 
+import com.anthonyahellman.silenttinkers.SilentTinkersMod;
 import com.anthonyahellman.silenttinkers.compat.silentgear.SilentGearAlloyReader;
 import com.anthonyahellman.silenttinkers.compat.silentgear.SilentGearStatReader;
+import com.anthonyahellman.silenttinkers.material.AlloyComposition;
 import com.anthonyahellman.silenttinkers.material.AlloyPayload;
+import com.anthonyahellman.silenttinkers.material.AlloyStatSnapshot;
+import com.anthonyahellman.silenttinkers.material.SourceVisualIdentity;
 import com.anthonyahellman.silenttinkers.registry.ModFluids;
 import com.anthonyahellman.silenttinkers.registry.ModRecipes;
 import net.minecraft.core.NonNullList;
@@ -16,9 +20,14 @@ import slimeknights.tconstruct.library.recipe.FluidValues;
 import slimeknights.tconstruct.library.recipe.melting.IMeltingContainer;
 import slimeknights.tconstruct.library.recipe.melting.IMeltingRecipe;
 
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
 /** Converts any valid Silent Gear compound alloy ingot into a tagged fluid. */
 public final class SilentAlloyMeltingRecipe implements IMeltingRecipe {
     public static final int TEMPERATURE = 1200;
+    private static final Set<String> LOGGED_MISSING_STAT_COMPOSITIONS = ConcurrentHashMap.newKeySet();
     private final ResourceLocation id;
 
     public SilentAlloyMeltingRecipe(ResourceLocation id) {
@@ -27,16 +36,37 @@ public final class SilentAlloyMeltingRecipe implements IMeltingRecipe {
 
     @Override
     public boolean matches(IMeltingContainer inventory, Level level) {
-        return SilentGearAlloyReader.read(inventory.getStack()).isPresent();
+        ItemStack sourceStack = inventory.getStack();
+        Optional<AlloyComposition> composition = SilentGearAlloyReader.read(sourceStack);
+        if (composition.isEmpty()) return false;
+        if (SilentGearStatReader.read(sourceStack).isPresent()) return true;
+        logMissingStats(composition.orElseThrow());
+        return false;
     }
 
     @Override
     public FluidStack getOutput(IMeltingContainer inventory) {
+        ItemStack sourceStack = inventory.getStack();
+        Optional<AlloyComposition> composition = SilentGearAlloyReader.read(sourceStack);
+        Optional<AlloyStatSnapshot> stats = SilentGearStatReader.read(sourceStack);
+        if (composition.isEmpty() || stats.isEmpty()) {
+            composition.ifPresent(SilentAlloyMeltingRecipe::logMissingStats);
+            return FluidStack.EMPTY;
+        }
+
         FluidStack output = new FluidStack(ModFluids.MOLTEN_COMPOSITE_ALLOY.get(), FluidValues.INGOT);
-        SilentGearAlloyReader.read(inventory.getStack()).ifPresent(composition -> AlloyPayload.write(
-                output, composition, SilentGearAlloyReader.readStarChargeLevel(inventory.getStack()),
-                SilentGearStatReader.read(inventory.getStack())));
+        AlloyPayload.write(output, composition.orElseThrow(),
+                SilentGearAlloyReader.readStarChargeLevel(sourceStack), stats,
+                SourceVisualIdentity.capture(sourceStack));
         return output;
+    }
+
+    private static void logMissingStats(AlloyComposition composition) {
+        if (LOGGED_MISSING_STAT_COMPOSITIONS.add(composition.fingerprint())) {
+            SilentTinkersMod.LOGGER.error(
+                    "[SilentTinkers:MELTING_REFUSED_MISSING_STATS] composition={} -- alloy remains unmeltable until Silent Gear can provide evaluated stats",
+                    composition.fingerprint());
+        }
     }
 
     @Override

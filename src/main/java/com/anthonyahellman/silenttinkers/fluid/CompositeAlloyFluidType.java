@@ -1,20 +1,33 @@
 package com.anthonyahellman.silenttinkers.fluid;
 
+import com.anthonyahellman.silenttinkers.client.AlloyVisualColorResolver;
+import com.anthonyahellman.silenttinkers.client.SourceVisualColorResolver;
+import com.anthonyahellman.silenttinkers.material.AlloyDisplayFormatter;
+import com.anthonyahellman.silenttinkers.material.AlloyPayload;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.client.extensions.common.IClientFluidTypeExtensions;
+import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.FluidType;
 
 import java.util.function.Consumer;
 
-/** Client-safe molten metal renderer backed by Minecraft's guaranteed lava sprites. */
+/** Dynamic molten alloy name and client renderer backed by Tinkers' neutral molten sprites. */
 public final class CompositeAlloyFluidType extends FluidType {
     private static final ResourceLocation STILL_TEXTURE =
-            new ResourceLocation("minecraft", "block/lava_still");
+            new ResourceLocation("tconstruct", "fluid/molten/still");
     private static final ResourceLocation FLOWING_TEXTURE =
-            new ResourceLocation("minecraft", "block/lava_flow");
+            new ResourceLocation("tconstruct", "fluid/molten/flowing");
 
     public CompositeAlloyFluidType(Properties properties) {
         super(properties);
+    }
+
+    @Override
+    public Component getDescription(FluidStack stack) {
+        return AlloyPayload.read(stack)
+                .<Component>map(composition -> Component.literal(AlloyDisplayFormatter.moltenLabel(composition)))
+                .orElseGet(() -> super.getDescription(stack));
     }
 
     @Override
@@ -32,7 +45,15 @@ public final class CompositeAlloyFluidType extends FluidType {
 
             @Override
             public int getTintColor() {
-                return 0xFFB768FF;
+                return SourceVisualColorResolver.FALLBACK_ARGB;
+            }
+
+            @Override
+            public int getTintColor(FluidStack stack) {
+                return AlloyPayload.read(stack)
+                        .map(composition -> AlloyVisualColorResolver.resolve(
+                                composition, AlloyPayload.readVisualSource(stack)))
+                        .orElse(SourceVisualColorResolver.FALLBACK_ARGB);
             }
         });
     }
