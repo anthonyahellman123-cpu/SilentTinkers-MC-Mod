@@ -45,6 +45,7 @@ public final class SilentTinkersCommands {
         long preserved = count(snapshot, MaterialGenerationEvaluation.Status.PRESERVED);
         long readyForTinkers = count(snapshot, MaterialGenerationEvaluation.Status.READY_FOR_TINKERS);
         long tinkersSourceReady = count(snapshot, MaterialGenerationEvaluation.Status.TINKERS_SOURCE_READY);
+        long roleLimited = count(snapshot, MaterialGenerationEvaluation.Status.ROLE_LIMITED);
         long bootstrapPending = count(snapshot, MaterialGenerationEvaluation.Status.BOOTSTRAP_PENDING);
         long quarantined = count(snapshot, MaterialGenerationEvaluation.Status.QUARANTINED);
         int runtimeReady = MaterialDiscoveryState.readyForTinkersCount();
@@ -64,6 +65,7 @@ public final class SilentTinkersCommands {
                         + " | deferred forms " + deferred), false);
         source.sendSuccess(() -> Component.literal(
                 "TCon→SG ready " + tinkersSourceReady
+                        + " | role-limited " + roleLimited
                         + " | bootstrap pending " + bootstrapPending
                         + " | quarantined " + quarantined), false);
         source.sendSuccess(() -> Component.literal(

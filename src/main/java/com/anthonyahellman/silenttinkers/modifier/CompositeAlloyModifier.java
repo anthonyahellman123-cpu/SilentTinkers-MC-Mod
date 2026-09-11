@@ -88,6 +88,12 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
                     sourceId -> TraitSourceResolver.resolve(sourceId, registeredMaterialIds),
                     resolvedId -> registry.getTraits(new MaterialId(resolvedId), HeadMaterialStats.ID));
 
+            Set<ModifierId> allNativeModifierIds = decisions.stream()
+                    .flatMap(decision -> decision.forwardedTraits().stream())
+                    .map(ModifierEntry::getId)
+                    .collect(Collectors.toSet());
+            List<TraitAdapterPlan.Decision> supportedAdapters = new java.util.ArrayList<>();
+
             for (TraitForwardingPlan.Decision<ModifierEntry> decision : decisions) {
                 String decisionKey = composition.fingerprint() + "|" + decision.sourceMaterialId()
                         + "|" + decision.access();
@@ -107,27 +113,27 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
                     decision.forwardedTraits().forEach(builder::add);
                 }
 
-                Set<ModifierId> nativeModifierIds = decision.forwardedTraits().stream()
-                        .map(ModifierEntry::getId)
-                        .collect(Collectors.toSet());
                 for (TraitAdapterPlan.Decision adapter : TraitAdapterPlan.create(
                         MaterialDiscoveryState.silentGearTraits(decision.sourceMaterialId()),
-                        decision.contributionLevel())) {
+                        decision.contributionLevel(), target ->
+                                new ModifierEntry(new ModifierId(target), 1).isBound())) {
                     String adapterKey = decisionKey + "|" + adapter.sourceTrait();
                     if (adapter.status() != TraitAdapterPlan.Status.SUPPORTED) {
-                        if (adapter.status() == TraitAdapterPlan.Status.UNSUPPORTED
+                        if ((adapter.status() == TraitAdapterPlan.Status.UNSUPPORTED
+                                || adapter.status() == TraitAdapterPlan.Status.TARGET_UNAVAILABLE)
                                 && LOGGED_TRAIT_ADAPTERS.add(adapterKey)) {
                             SilentTinkersMod.LOGGER.info(
-                                    "[SilentTinkers:TRAIT_ADAPTER_UNSUPPORTED] composite={} source={} trait={} percent={} level={} reason={} -- material remains usable",
+                                    "[SilentTinkers:TRAIT_FORWARD_UNSUPPORTED] composite={} source={} trait={} kind={} percent={} level={} status={} reason={} -- material remains usable",
                                     composition.fingerprint(), decision.sourceMaterialId(), adapter.sourceTrait(),
-                                    decision.materialPercent(), adapter.contributionLevel(), adapter.detail());
+                                    adapter.kind(), decision.materialPercent(), adapter.contributionLevel(),
+                                    adapter.status(), adapter.detail());
                         }
                         continue;
                     }
 
                     ModifierEntry adapted = new ModifierEntry(
                             new ModifierId(adapter.targetModifier().orElseThrow()), adapter.contributionLevel());
-                    if (nativeModifierIds.contains(adapted.getId())) {
+                    if (allNativeModifierIds.contains(adapted.getId())) {
                         if (LOGGED_TRAIT_ADAPTERS.add(adapterKey)) {
                             SilentTinkersMod.LOGGER.info(
                                     "[SilentTinkers:TRAIT_ADAPTER_DUPLICATE] composite={} source={} trait={} target={} -- native material trait retained without duplicate application",
@@ -143,10 +149,11 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
                         }
                         continue;
                     }
-                    builder.add(adapted);
+                    supportedAdapters.add(adapter);
                     if (LOGGED_TRAIT_ADAPTERS.add(adapterKey)) {
                         SilentTinkersMod.LOGGER.info(
-                                "[SilentTinkers:TRAIT_ADAPTER_FORWARD] composite={} source={} trait={} target={} percent={} level={}",
+                                "[SilentTinkers:TRAIT_FORWARD_{}] composite={} source={} trait={} target={} percent={} level={}",
+                                adapter.kind() == TraitAdapterPlan.Kind.DIRECT ? "DIRECT" : "ADAPTER",
                                 composition.fingerprint(), decision.sourceMaterialId(), adapter.sourceTrait(), adapted.getId(),
                                 decision.materialPercent(), adapter.contributionLevel());
                     }
@@ -164,6 +171,10 @@ public final class CompositeAlloyModifier extends Modifier implements ToolStatsM
                             decision.forwardedTraits().size());
                 }
             }
+
+            TraitAdapterPlan.applications(supportedAdapters,
+                            new java.util.ArrayList<net.minecraft.resources.ResourceLocation>(allNativeModifierIds))
+                    .forEach((target, level) -> builder.add(new ModifierEntry(new ModifierId(target), level)));
         }
     }
 

@@ -33,6 +33,7 @@ public record MaterialGenerationEvaluation(
         PRESERVED,
         READY_FOR_TINKERS,
         TINKERS_SOURCE_READY,
+        ROLE_LIMITED,
         BOOTSTRAP_PENDING,
         QUARANTINED
     }

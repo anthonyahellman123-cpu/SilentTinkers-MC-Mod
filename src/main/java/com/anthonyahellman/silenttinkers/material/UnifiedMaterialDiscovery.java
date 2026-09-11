@@ -54,6 +54,7 @@ public final class UnifiedMaterialDiscovery {
 
         int readyForTinkers = 0;
         int tinkersSourceReady = 0;
+        int roleLimited = 0;
         int bootstrapPending = 0;
         int requestQuarantined = 0;
         int preserved = 0;
@@ -91,6 +92,13 @@ public final class UnifiedMaterialDiscovery {
                             value.harvestTier(), value.handleDurabilityModifier(), value.handleMiningSpeedModifier(),
                             value.handleAttackSpeedModifier(), value.handleDamageModifier());
                 }
+                case ROLE_LIMITED -> {
+                    roleLimited++;
+                    SilentTinkersMod.LOGGER.info(
+                            "[SilentTinkers:PRIORITY_MATERIAL_ROLE_LIMITED] item={} sourceMaterial={} reason={}",
+                            request.physicalItem(), request.sourceMaterialId().map(Object::toString).orElse("NONE"),
+                            evaluation.detail());
+                }
                 case BOOTSTRAP_PENDING -> bootstrapPending++;
                 case QUARANTINED -> {
                     requestQuarantined++;
@@ -102,8 +110,19 @@ public final class UnifiedMaterialDiscovery {
         }
 
         SilentTinkersMod.LOGGER.info(
-                "[SilentTinkers:EVALUATION_PLAN] readyForTinkers={} tinkersSourceReady={} bootstrapPending={} requestQuarantined={} aliasQuarantined={}",
-                readyForTinkers, tinkersSourceReady, bootstrapPending, requestQuarantined, ambiguous.size());
+                "[SilentTinkers:EVALUATION_PLAN] readyForTinkers={} tinkersSourceReady={} roleLimited={} bootstrapPending={} requestQuarantined={} aliasQuarantined={}",
+                readyForTinkers, tinkersSourceReady, roleLimited, bootstrapPending, requestQuarantined, ambiguous.size());
+
+        PriorityMaterialAudit.Report priorityAudit = PriorityMaterialAudit.evaluate(evaluations);
+        for (PriorityMaterialAudit.PriorityEcosystem ecosystem : PriorityMaterialAudit.PriorityEcosystem.values()) {
+            for (PriorityMaterialAudit.Coverage coverage : PriorityMaterialAudit.Coverage.values()) {
+                int count = priorityAudit.count(ecosystem, coverage);
+                if (count > 0) {
+                    SilentTinkersMod.LOGGER.info("[SilentTinkers:PRIORITY_MATERIAL_{}] ecosystem={} materials={}",
+                            coverage, ecosystem, count);
+                }
+            }
+        }
 
         Snapshot completedSnapshot = new Snapshot(index, silentGear, tinkers,
                 List.copyOf(correlated), List.copyOf(bridgeCandidates), List.copyOf(evaluations));

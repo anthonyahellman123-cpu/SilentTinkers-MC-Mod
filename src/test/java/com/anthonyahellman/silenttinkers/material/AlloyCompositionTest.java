@@ -91,6 +91,14 @@ class AlloyCompositionTest {
         assertThrows(IllegalArgumentException.class, () -> AlloyComposition.load(invalid));
     }
 
+    @Test
+    void rejectsZeroAndMalformedCompositionUnits() {
+        Map<ResourceLocation, Long> zero = new LinkedHashMap<>();
+        zero.put(id("silentgear:iron"), 0L);
+        assertThrows(IllegalArgumentException.class, () -> AlloyComposition.of(zero));
+        assertThrows(IllegalArgumentException.class, () -> AlloyComposition.of(Map.of()));
+    }
+
     private static Map<ResourceLocation, Long> alloy(long iron, long redstone, long diamond) {
         Map<ResourceLocation, Long> result = new LinkedHashMap<>();
         result.put(id("silentgear:iron"), iron);

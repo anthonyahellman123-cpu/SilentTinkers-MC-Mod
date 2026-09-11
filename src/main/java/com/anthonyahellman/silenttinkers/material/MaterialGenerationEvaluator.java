@@ -29,6 +29,11 @@ public final class MaterialGenerationEvaluator {
             if (translated.isEmpty()) return quarantined(request, "Silent Gear source stats could not be translated");
             HeadMaterialEligibility.Result eligibility = HeadMaterialEligibility.evaluate(translated.orElseThrow());
             if (!eligibility.eligible()) {
+                if (eligibility.classification() == HeadMaterialEligibility.Classification.ROLE_LIMITED) {
+                    return new MaterialGenerationEvaluation(request,
+                            MaterialGenerationEvaluation.Status.ROLE_LIMITED,
+                            translated, Optional.empty(), eligibility.detail());
+                }
                 return quarantined(request, "Silent Gear source is not eligible as a Tinkers head: "
                         + eligibility.detail());
             }

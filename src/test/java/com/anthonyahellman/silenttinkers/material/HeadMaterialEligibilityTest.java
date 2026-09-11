@@ -4,6 +4,7 @@ import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class HeadMaterialEligibilityTest {
@@ -15,6 +16,7 @@ final class HeadMaterialEligibilityTest {
                 new TranslatedMaterialStats(0, 0, 0, 0, WOOD));
 
         assertFalse(result.eligible());
+        assertEquals(HeadMaterialEligibility.Classification.REJECTED, result.classification());
     }
 
     @Test
@@ -23,6 +25,7 @@ final class HeadMaterialEligibilityTest {
                 new TranslatedMaterialStats(120, 0, 0, 0, WOOD));
 
         assertFalse(result.eligible());
+        assertEquals(HeadMaterialEligibility.Classification.ROLE_LIMITED, result.classification());
     }
 
     @Test

@@ -32,6 +32,59 @@ final class TraitAdapterPlanTest {
     }
 
     @Test
+    void verifiedDirectMagneticMappingUsesCompositionLevel() {
+        TraitAdapterPlan.Decision decision = TraitAdapterPlan.create(
+                List.of(TraitAdapterPlan.MAGNETIC_TRAIT), 2).get(0);
+
+        assertEquals(TraitAdapterPlan.Status.SUPPORTED, decision.status());
+        assertEquals(TraitAdapterPlan.Kind.DIRECT, decision.kind());
+        assertEquals(TraitAdapterPlan.MAGNETIC_MODIFIER, decision.targetModifier().orElseThrow());
+        assertEquals(2, decision.contributionLevel());
+    }
+
+    @Test
+    void knownBehaviorWithoutAdapterIsExplicitlyUnsupported() {
+        TraitAdapterPlan.Decision decision = TraitAdapterPlan.create(
+                List.of(TraitAdapterPlan.WITHER_SKULL_TRAIT), 3).get(0);
+
+        assertEquals(TraitAdapterPlan.Status.UNSUPPORTED, decision.status());
+        assertEquals(TraitAdapterPlan.Kind.BEHAVIORAL, decision.kind());
+        assertTrue(decision.targetModifier().isEmpty());
+    }
+
+    @Test
+    void unavailableModifierTargetFailsClosed() {
+        TraitAdapterPlan.Decision decision = TraitAdapterPlan.create(
+                List.of(TraitAdapterPlan.MAGNETIC_TRAIT), 2, ignored -> false).get(0);
+
+        assertEquals(TraitAdapterPlan.Status.TARGET_UNAVAILABLE, decision.status());
+        assertTrue(decision.targetModifier().isEmpty());
+    }
+
+    @Test
+    void duplicateSourceTraitDoesNotDuplicateApplication() {
+        List<TraitAdapterPlan.Decision> decisions = TraitAdapterPlan.create(
+                List.of(TraitAdapterPlan.MAGNETIC_TRAIT, TraitAdapterPlan.MAGNETIC_TRAIT), 2);
+
+        assertEquals(1, decisions.size());
+    }
+
+    @Test
+    void equivalentTargetsCollapseToHighestLevelIndependentOfOrder() {
+        List<TraitAdapterPlan.Decision> lowerFirst = List.of(
+                TraitAdapterPlan.create(List.of(TraitAdapterPlan.MAGNETIC_TRAIT), 1).get(0),
+                TraitAdapterPlan.create(List.of(TraitAdapterPlan.MAGNETIC_TRAIT), 3).get(0));
+        List<TraitAdapterPlan.Decision> higherFirst = List.of(lowerFirst.get(1), lowerFirst.get(0));
+
+        Map<net.minecraft.resources.ResourceLocation, Integer> expected =
+                Map.of(TraitAdapterPlan.MAGNETIC_MODIFIER, 3);
+        assertEquals(expected, TraitAdapterPlan.applications(lowerFirst, List.of()));
+        assertEquals(expected, TraitAdapterPlan.applications(higherFirst, List.of()));
+        assertTrue(TraitAdapterPlan.applications(lowerFirst,
+                List.of(TraitAdapterPlan.MAGNETIC_MODIFIER)).isEmpty());
+    }
+
+    @Test
     void belowThresholdTraitDoesNotProduceModifier() {
         TraitAdapterPlan.Decision decision = TraitAdapterPlan.create(
                 List.of(TraitAdapterPlan.PIXIE_TRAIT), 0).get(0);
